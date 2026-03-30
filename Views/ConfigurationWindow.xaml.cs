@@ -9,10 +9,14 @@ namespace Top5.Views
         {
             InitializeComponent();
 
-            if (DataContext is ConfigurationViewModel viewModel)
+            // Correction EDR / MVVM : Attendre que le DataContext soit injecté
+            DataContextChanged += (s, e) =>
             {
-                viewModel.CloseAction = new System.Action(this.Close);
-            }
+                if (DataContext is ConfigurationViewModel viewModel)
+                {
+                    viewModel.CloseAction = () => this.Close();
+                }
+            };
         }
 
         private void BtnAnnuler_Click(object sender, RoutedEventArgs e)

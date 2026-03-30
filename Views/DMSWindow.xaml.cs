@@ -9,11 +9,13 @@ namespace Top5.Views
         {
             InitializeComponent();
 
-            // On lie la fermeture de la fenêtre au ViewModel
-            if (DataContext is DMSViewModel vm)
+            DataContextChanged += (s, e) =>
             {
-                vm.CloseAction = new System.Action(this.Close);
-            }
+                if (DataContext is DMSViewModel vm)
+                {
+                    vm.CloseAction = () => this.Close();
+                }
+            };
         }
 
         private void BtnAnnuler_Click(object sender, RoutedEventArgs e)

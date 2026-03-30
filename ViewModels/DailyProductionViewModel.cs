@@ -43,43 +43,52 @@ namespace Top5.ViewModels
 
         private void ExecuteSave(object? obj)
         {
-            // 1. PASSE DE VALIDATION
-            // On vérifie d'abord toutes les lignes modifiées avant d'enregistrer quoi que ce soit
-            foreach (var item in AssignmentItems)
+            var changes = AssignmentItems.Where(i => i.HasChanged).ToList();
+
+            if (changes.Count == 0)
             {
-                if (item.HasChanged)
+                CloseAction?.Invoke();
+                return;
+            }
+
+            // 1. PASSE DE VALIDATION
+            foreach (var item in changes)
+            {
+                bool isPieceEmpty = item.SelectedPiece == "---" || string.IsNullOrWhiteSpace(item.SelectedPiece);
+                bool isMouleEmpty = item.SelectedMoule == "---" || string.IsNullOrWhiteSpace(item.SelectedMoule);
+
+                if (isPieceEmpty != isMouleEmpty)
                 {
-                    bool isPieceEmpty = item.SelectedPiece == "---" || string.IsNullOrWhiteSpace(item.SelectedPiece);
-                    bool isMouleEmpty = item.SelectedMoule == "---" || string.IsNullOrWhiteSpace(item.SelectedMoule);
-
-                    // XOR logique : Si l'un est vide mais pas l'autre, c'est une erreur métier
-                    if (isPieceEmpty != isMouleEmpty)
-                    {
-                        MessageBox.Show(
-                            $"Affectation invalide sur la machine {item.Machine}.\n\n" +
-                            "Règle de production : Vous devez sélectionner à la fois une Pièce ET un Moule, " +
-                            "ou laisser les deux sur '---' pour indiquer un arrêt.",
-                            "Validation impossible",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-
-                        // On interrompt la sauvegarde, la fenêtre reste ouverte pour correction
-                        return;
-                    }
+                    MessageBox.Show(
+                        $"Affectation invalide sur la machine {item.Machine}.\n\n" +
+                        "Règle de production : Vous devez sélectionner à la fois une Pièce ET un Moule, " +
+                        "ou laisser les deux sur '---' pour indiquer un arrêt.",
+                        "Validation impossible",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
                 }
             }
 
-            // 2. PASSE DE SAUVEGARDE
-            // Si la validation passe, on applique les modifications
-            foreach (var item in AssignmentItems)
+            // 2. DEMANDE DE CONFIRMATION DES CHANGEMENTS
+            string msg = "Confirmez-vous les changements d'affectation suivants ?\n\n";
+            foreach (var c in changes)
             {
-                if (item.HasChanged)
-                {
-                    item.ContextRef.Piece = item.SelectedPiece;
-                    item.ContextRef.Moule = item.SelectedMoule;
+                msg += $"- {c.Machine} : [{c.OriginalPiece} / {c.OriginalMoule}]  =>  [{c.SelectedPiece} / {c.SelectedMoule}]\n";
+            }
 
-                    ProductionHistoryService.LogChange(item.Machine, item.SelectedPiece, item.SelectedMoule);
-                }
+            if (MessageBox.Show(msg, "Confirmation des modifications", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                return; // Annulé par l'utilisateur, la fenêtre reste ouverte
+            }
+
+            // 3. PASSE DE SAUVEGARDE ET HISTORISATION
+            foreach (var item in changes)
+            {
+                item.ContextRef.Piece = item.SelectedPiece;
+                item.ContextRef.Moule = item.SelectedMoule;
+
+                ProductionHistoryService.LogChange(item.Machine, item.SelectedPiece, item.SelectedMoule);
             }
 
             CloseAction?.Invoke();

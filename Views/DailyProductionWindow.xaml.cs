@@ -9,10 +9,13 @@ namespace Top5.Views
         {
             InitializeComponent();
 
-            if (DataContext is DailyProductionViewModel viewModel)
+            DataContextChanged += (s, e) =>
             {
-                viewModel.CloseAction = new System.Action(this.Close);
-            }
+                if (DataContext is DailyProductionViewModel viewModel)
+                {
+                    viewModel.CloseAction = () => this.Close();
+                }
+            };
         }
 
         private void BtnAnnuler_Click(object sender, RoutedEventArgs e)

@@ -28,6 +28,12 @@ namespace Top5.ViewModels
             get => _viewingDate;
             set
             {
+                // BLOCAGE : Impossible d'aller au-delà d'aujourd'hui
+                if (value.Date > DateTime.Today)
+                {
+                    value = DateTime.Today;
+                }
+
                 if (_viewingDate != value)
                 {
                     ForceSave();
@@ -43,7 +49,18 @@ namespace Top5.ViewModels
         public int ViewingDayOfYear
         {
             get => ViewingDate.DayOfYear;
-            set { try { ViewingDate = new DateTime(ViewingDate.Year, 1, 1).AddDays(value - 1); } catch { } }
+            set
+            {
+                try
+                {
+                    var newDate = new DateTime(ViewingDate.Year, 1, 1).AddDays(value - 1);
+                    if (newDate.Date <= DateTime.Today)
+                    {
+                        ViewingDate = newDate;
+                    }
+                }
+                catch { }
+            }
         }
 
         public bool IsCurrentDay => ViewingDate.Date == DateTime.Today;
@@ -58,17 +75,14 @@ namespace Top5.ViewModels
         #endregion
 
         #region Logique des Shifts avec BATTEMENT DE 10 MINUTES
-        // 1. Détection visuelle (Fond bleu) : Change à l'heure pile
         public bool IsMatinActive => IsCurrentDay && IsTimeBetween(new TimeSpan(4, 30, 0), new TimeSpan(12, 30, 0));
         public bool IsApresMidiActive => IsCurrentDay && IsTimeBetween(new TimeSpan(12, 30, 0), new TimeSpan(20, 30, 0));
         public bool IsNuitActive => IsCurrentDay && (IsTimeBetween(new TimeSpan(20, 30, 0), new TimeSpan(23, 59, 59)) || IsTimeBetween(new TimeSpan(0, 0, 0), new TimeSpan(4, 30, 0)));
 
-        // 2. Verrouillage des saisies : Laisse 10 minutes de plus à l'équipe sortante
         public bool IsMatinEnabled => IsCurrentDay && IsTimeBetween(new TimeSpan(4, 30, 0), new TimeSpan(12, 40, 0));
         public bool IsApresMidiEnabled => IsCurrentDay && IsTimeBetween(new TimeSpan(12, 30, 0), new TimeSpan(20, 40, 0));
         public bool IsNuitEnabled => IsCurrentDay && (IsTimeBetween(new TimeSpan(20, 30, 0), new TimeSpan(23, 59, 59)) || IsTimeBetween(new TimeSpan(0, 0, 0), new TimeSpan(4, 40, 0)));
 
-        // 3. Verrouillage des Noms (Même règle des 10 minutes)
         public bool IsMatinTimeWindow => IsMatinEnabled;
         public bool IsApresMidiTimeWindow => IsApresMidiEnabled;
         public bool IsNuitTimeWindow => IsNuitEnabled;
@@ -79,11 +93,27 @@ namespace Top5.ViewModels
             if (start <= end) return now >= start && now <= end;
             return now >= start || now <= end;
         }
+
+        private ShiftReport GetActiveShift(ProductionRow row)
+        {
+            if (IsMatinActive) return row.ReportMatin;
+            if (IsApresMidiActive) return row.ReportApresMidi;
+            if (IsNuitActive) return row.ReportNuit;
+            return row.ReportMatin;
+        }
         #endregion
 
         #region Commands
         public ICommand PreviousDayCommand => new RelayCommand(_ => ViewingDate = ViewingDate.AddDays(-1));
-        public ICommand NextDayCommand => new RelayCommand(_ => ViewingDate = ViewingDate.AddDays(1));
+
+        // Double sécurité : On vérifie avant d'incrémenter
+        public ICommand NextDayCommand => new RelayCommand(_ => {
+            if (ViewingDate.Date < DateTime.Today)
+            {
+                ViewingDate = ViewingDate.AddDays(1);
+            }
+        });
+
         public ICommand GoToTodayCommand => new RelayCommand(_ => ViewingDate = DateTime.Today);
 
         public ICommand PrintReportCommand => new RelayCommand(_ =>
@@ -108,18 +138,15 @@ namespace Top5.ViewModels
             string shift = param?.ToString() ?? "";
             string current = shift switch { "Matin" => TeamCommentMatin, "ApresMidi" => TeamCommentApresMidi, "Nuit" => TeamCommentNuit, _ => "" };
 
-            // Vérification de sécurité : Seule l'équipe en cours (avec ses 10 min de battement) peut modifier
             bool isReadOnly = true;
             if (shift == "Matin") isReadOnly = !IsMatinTimeWindow;
             else if (shift == "ApresMidi") isReadOnly = !IsApresMidiTimeWindow;
             else if (shift == "Nuit") isReadOnly = !IsNuitTimeWindow;
 
-            // On ouvre notre belle nouvelle fenêtre
             var vm = new TeamCommentViewModel(shift, current, isReadOnly);
             var win = new Top5.Views.TeamCommentWindow { DataContext = vm, Owner = Application.Current.MainWindow };
             win.ShowDialog();
 
-            // On ne sauvegarde QUE si l'utilisateur a cliqué sur le bouton "Enregistrer" (Corrige le bug d'effacement)
             if (vm.IsSaved)
             {
                 if (shift == "Matin") TeamCommentMatin = vm.Comment;
@@ -128,8 +155,6 @@ namespace Top5.ViewModels
                 ForceSave();
             }
         });
-
-        // --- COMMANDES DU MENU ---
 
         public ICommand OpenDailyProductionCommand => new RelayCommand(_ => {
             var vm = new DailyProductionViewModel(ProductionRows);
@@ -151,7 +176,9 @@ namespace Top5.ViewModels
         });
 
         public ICommand OpenProductionHistoryCommand => new RelayCommand(_ => {
-            var win = new Top5.Views.ProductionHistoryWindow { Owner = Application.Current.MainWindow };
+            // CORRECTION : Instanciation et liaison du ViewModel manquant
+            var vm = new ProductionHistoryViewModel();
+            var win = new Top5.Views.ProductionHistoryWindow { DataContext = vm, Owner = Application.Current.MainWindow };
             win.ShowDialog();
         });
 
@@ -174,7 +201,6 @@ namespace Top5.ViewModels
 
         private void LoadDateData()
         {
-            // 1. On charge TOUJOURS le catalogue des machines en premier pour construire la grille
             ProductionRows.Clear();
             var catalog = ProductionDataService.Load();
             if (catalog != null && catalog.Machines != null)
@@ -185,10 +211,8 @@ namespace Top5.ViewModels
                 }
             }
 
-            // 2. On utilise le VRAI service pour charger le fichier TOP5-Jour...
             bool fileLoaded = Top5HistoryService.LoadDailyReport(this, ViewingDate);
 
-            // 3. S'il n'y a pas de fichier (nouveau jour), on met les variables à zéro et on cherche les dernières pièces produites
             if (!fileLoaded)
             {
                 ControllerMatin = "";
@@ -206,11 +230,20 @@ namespace Top5.ViewModels
                         row.Production.Piece = latestStates[row.Production.Machine].Piece;
                         row.Production.Moule = latestStates[row.Production.Machine].Moule;
                         row.Production.RefreshDMS();
+
+                        var unresolvedDefects = DefectHistoryService.GetUnresolvedDefects(row.Production.Piece, row.Production.Moule);
+                        if (unresolvedDefects.Count > 0)
+                        {
+                            var activeShift = GetActiveShift(row);
+                            foreach (var defect in unresolvedDefects)
+                            {
+                                activeShift.Defects.Add(defect);
+                            }
+                        }
                     }
                 }
             }
 
-            // 4. Sécurité des noms
             foreach (var row in ProductionRows)
             {
                 if (row.ReportMatin != null) row.ReportMatin.GetControllerName = () => ControllerMatin;
@@ -221,8 +254,13 @@ namespace Top5.ViewModels
 
         public void ForceSave()
         {
-            // On utilise le VRAI service de sauvegarde
-            Top5HistoryService.SaveDailyReport(this, ViewingDate);
+            // CORRECTION : Protection stricte contre la création de fichiers "fantômes"
+            // On ne sauvegarde QUE si la date visionnée est la date du jour. 
+            // Les dates passées sont en lecture seule.
+            if (_viewingDate.Date == DateTime.Today)
+            {
+                Top5HistoryService.SaveDailyReport(this, _viewingDate);
+            }
         }
     }
 }
