@@ -1,0 +1,36 @@
+<Window x:Class="Top5.Views.DefectTypesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Gestion des Types de Défauts" Height="450" Width="400" 
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" Background="#FAFAFA">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Liste des types de défauts" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="#333333"/>
+
+        <ListBox Grid.Row="1" ItemsSource="{Binding DefectTypes}" SelectedItem="{Binding SelectedType}" Margin="0,0,0,10" BorderBrush="#CCCCCC"/>
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding NewType, UpdateSourceTrigger=PropertyChanged}" Height="28" VerticalContentAlignment="Center" Margin="0,0,5,0"/>
+                <Button Grid.Column="1" Content="Ajouter" Command="{Binding AddCommand}" Width="70" Height="28"/>
+            </Grid>
+            <Button Content="Supprimer la sélection" Command="{Binding DeleteCommand}" Height="28" Margin="0,5,0,0" Background="#FADBD8" Foreground="#943126"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Annuler" Width="90" Height="32" Margin="0,0,10,0" Click="BtnAnnuler_Click" Background="White"/>
+            <Button Content="Enregistrer" Command="{Binding SaveCommand}" Width="120" Height="32" Background="#0078D7" Foreground="White" FontWeight="Bold"/>
+        </StackPanel>
+    </Grid>
+</Window>

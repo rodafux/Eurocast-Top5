@@ -1,0 +1,51 @@
+<Window x:Class="Top5.Views.DailyProductionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Affectation des Productions en cours" Height="600" Width="650" 
+        WindowStartupLocation="CenterOwner" Background="#FAFAFA">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Définir les productions du jour par machine" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,15" Foreground="#333333"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Background="White" BorderBrush="#DDDDDD" BorderThickness="1" Padding="10">
+            <ItemsControl ItemsSource="{Binding AssignmentItems}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="{Binding Machine}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Foreground="#005A9E"/>
+
+                            <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                                <TextBlock Text="Pièce" FontSize="11" Foreground="#666666" Margin="0,0,0,2"/>
+                                <ComboBox ItemsSource="{Binding DataContext.AvailablePieces, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                          SelectedItem="{Binding SelectedPiece}" Height="28"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Moule" FontSize="11" Foreground="#666666" Margin="0,0,0,2"/>
+                                <ComboBox ItemsSource="{Binding DataContext.AvailableMoules, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                          SelectedItem="{Binding SelectedMoule}" Height="28"/>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="Annuler" Width="90" Height="32" Margin="0,0,10,0" Click="BtnAnnuler_Click" Background="White"/>
+            <Button Content="Valider les affectations" Command="{Binding SaveCommand}" Width="160" Height="32" Background="#0078D7" Foreground="White" FontWeight="Bold"/>
+        </StackPanel>
+    </Grid>
+</Window>

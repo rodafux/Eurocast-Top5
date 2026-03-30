@@ -1,0 +1,32 @@
+<Window x:Class="Top5.Views.ConfigurationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configuration Globale" Height="250" Width="550" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Dossier de sauvegarde des données (Serveur partagé) :" FontWeight="Bold" Margin="0,0,0,5"/>
+            <TextBox Text="{Binding DatabasePath}" Height="25" Padding="2" ToolTip="Laissez vide pour utiliser 'Mes Documents' en local."/>
+            <TextBlock Text="Laissez vide pour sauvegarder sur cet ordinateur (Mes Documents/Top5)." FontStyle="Italic" Foreground="Gray" FontSize="11" Margin="0,2,0,0"/>
+
+            <StackPanel Margin="0,20,0,0">
+                <TextBlock Text="Alerte d'usure des noyaux :" FontWeight="Bold" Foreground="#333333" Margin="0,0,0,5"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Déclencher une alerte si le même noyau a été HS/Cassé/Plié dans les" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <TextBox Text="{Binding NoyauAlertDays}" Width="40" TextAlignment="Center" Padding="2"/>
+                    <TextBlock Text="derniers jours." VerticalAlignment="Center" Margin="5,0,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="Annuler" Command="{Binding CancelCommand}" Width="100" Height="30" Margin="0,0,10,0"/>
+            <Button Content="Enregistrer" Command="{Binding SaveCommand}" Width="100" Height="30" Background="#2ECC71" Foreground="White" FontWeight="Bold"/>
+        </StackPanel>
+    </Grid>
+</Window>

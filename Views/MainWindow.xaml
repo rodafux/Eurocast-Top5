@@ -1,0 +1,333 @@
+﻿<Window x:Class="Top5.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:viewModels="clr-namespace:Top5.ViewModels"
+        xmlns:views="clr-namespace:Top5.Views"
+        xmlns:converters="clr-namespace:Top5.Converters"
+        Title="Eurocast - Top5 Qualité" Height="800" Width="1200" WindowState="Maximized" WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing">
+
+    <Window.DataContext>
+        <viewModels:MainViewModel />
+    </Window.DataContext>
+
+    <Window.Resources>
+        <converters:StringToBooleanConverter x:Key="StringToBooleanConverter" />
+
+        <Style x:Key="BlinkingAttentionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Red"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Converter={StaticResource StringToBooleanConverter}}" Value="True">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard RepeatBehavior="Forever">
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.1" Duration="0:0:0.6" AutoReverse="True"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <Menu DockPanel.Dock="Top" Height="25" VerticalAlignment="Top" Background="#EEEEEE">
+            <MenuItem Header="Fichier">
+                <MenuItem Header="Imprimer le rapport A4 (PDF)" Command="{Binding PrintReportCommand}" />
+            </MenuItem>
+            <MenuItem Header="Historique">
+                <MenuItem Header="Changements de productions" Command="{Binding OpenProductionHistoryCommand}" />
+                <MenuItem Header="Défauts par Pièce / Moule" Command="{Binding OpenDefectHistoryCommand}" />
+            </MenuItem>
+            <MenuItem Header="Paramètres">
+                <MenuItem Header="Gestion des productions en cours" Command="{Binding OpenDailyProductionCommand}" IsEnabled="{Binding IsCurrentDay}"/>
+                <MenuItem Header="Gestion des Machines/Pièces/Moules" Command="{Binding OpenCatalogCommand}" />
+                <MenuItem Header="Types de défauts" Command="{Binding OpenDefectTypesCommand}" />
+                <Separator />
+                <MenuItem Header="Configuration" Command="{Binding OpenConfigurationCommand}" />
+            </MenuItem>
+        </Menu>
+
+        <Border DockPanel.Dock="Top" Background="#E3F2FD" BorderBrush="#90CAF9" BorderThickness="0,0,0,1" Padding="10,5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="Date du TOP 5 :" FontWeight="Bold" Foreground="#1565C0" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <Button Content="&#x25C0;" Command="{Binding PreviousDayCommand}" Width="26" Height="26" Background="White" BorderBrush="#90CAF9" Foreground="#1565C0" Margin="0,0,5,0" Cursor="Hand" ToolTip="Jour précédent"/>
+                    <DatePicker SelectedDate="{Binding ViewingDate}" Width="110" Height="26" Margin="0,0,5,0"/>
+                    <Button Content="&#x25B6;" Command="{Binding NextDayCommand}" Width="26" Height="26" Background="White" BorderBrush="#90CAF9" Foreground="#1565C0" Margin="0,0,20,0" Cursor="Hand" ToolTip="Jour suivant"/>
+                    <TextBlock Text="Jour de l'année n° :" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <TextBox Text="{Binding ViewingDayOfYear, UpdateSourceTrigger=PropertyChanged, Delay=800}" Width="50" Height="26" VerticalContentAlignment="Center" TextAlignment="Center" Margin="0,0,15,0" Background="White"/>
+
+                    <Button Content="Revenir à Aujourd'hui" Command="{Binding GoToTodayCommand}" Background="#1976D2" Foreground="White" FontWeight="Bold" Padding="10,0" Height="26">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurrentDay}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+
+                <Border Grid.Column="1" Background="#E74C3C" CornerRadius="4" Margin="20,0" Padding="15,0" HorizontalAlignment="Center">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCurrentDay}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="MODE ARCHIVE : LECTURE SEULE" Foreground="White" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <DataGrid ItemsSource="{Binding ProductionRows}" AutoGenerateColumns="False" CanUserAddRows="False" 
+                  RowDetailsVisibilityMode="Collapsed" Background="White"
+                  GridLinesVisibility="All" VerticalGridLinesBrush="#E0E0E0" HorizontalGridLinesBrush="#E0E0E0"
+                  RowBackground="#FFFFFF">
+
+            <DataGrid.Resources>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="Black"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="Black"/>
+            </DataGrid.Resources>
+
+            <DataGrid.CellStyle>
+                <Style TargetType="DataGridCell">
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                </Style>
+            </DataGrid.CellStyle>
+
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="#F8F9FA"/>
+                        </Trigger>
+                        <DataTrigger Binding="{Binding Production.Priority}" Value="1">
+                            <Setter Property="Background" Value="#FDEDEC"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Production.Priority}" Value="2">
+                            <Setter Property="Background" Value="#FEF5E7"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Production.Priority}" Value="3">
+                            <Setter Property="Background" Value="#FEF9E7"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Width="240">
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <Grid HorizontalAlignment="Stretch" Width="230">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="35"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Prio." FontWeight="Bold" Foreground="#7F8C8D" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="Production (Machine/Pièce/Moule)" FontWeight="Bold" Margin="5,5,0,5" VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid Margin="5,0,5,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Button Grid.Column="0" Click="BtnPriority_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Cliquez pour définir la priorité (1, 2, 3 ou Aucune)">
+                                    <Grid Width="24" Height="24">
+                                        <Ellipse Fill="{Binding Production.PriorityColor}" />
+                                        <TextBlock Text="{Binding Production.PriorityText}" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1"/>
+                                    </Grid>
+                                </Button>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Production.Machine}" FontSize="14" FontWeight="Bold" Foreground="#222222"/>
+                                    <TextBlock Text="{Binding Production.Piece}" FontSize="12" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding Production.Moule}" FontSize="11" Foreground="#666666" FontStyle="Italic"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="État DMS :" FontSize="11" Foreground="#555555" Margin="0,0,5,0" VerticalAlignment="Center" FontStyle="Italic"/>
+                                    <Button Command="{Binding DataContext.OpenDMSCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                            CommandParameter="{Binding Production}" IsEnabled="{Binding DataContext.IsCurrentDay, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            Background="Transparent" BorderThickness="0" Cursor="Hand" VerticalAlignment="Center">
+                                        <Button.ToolTip>
+                                            <ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="Gérer le Démarrage Série (DMS)" FontWeight="Bold" Margin="0,0,0,3"/>
+                                                    <TextBlock Text="{Binding Production.LastDMSDateString, StringFormat='Dernier renouvellement : {0}'}" Foreground="#333333"/>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                        <Ellipse Fill="{Binding Production.DMSColor}" Width="16" Height="16" Stroke="#BBBBBB" StrokeThickness="1"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Width="*">
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,5" HorizontalAlignment="Stretch">
+                                <TextBlock Text="Matin (04:30 - 12:30)" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="Contrôleur :" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#555555"/>
+                                    <TextBox Width="120" Text="{Binding DataContext.ControllerMatin, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}" 
+                                             IsEnabled="{Binding DataContext.IsMatinTimeWindow, RelativeSource={RelativeSource AncestorType=Window}}" Padding="2" Background="#FAFAFA"/>
+
+                                    <Button Command="{Binding DataContext.EditTeamCommentCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                            CommandParameter="Matin" Background="Transparent" BorderThickness="0" Margin="5,0,0,0" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="💬" FontSize="14" VerticalAlignment="Center" ToolTip="Ajouter un commentaire d'équipe"/>
+                                            <TextBlock Text="⚠️ ATTENTION" Style="{StaticResource BlinkingAttentionStyle}" 
+                                                       DataContext="{Binding DataContext.TeamCommentMatin, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="4" Margin="2">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="2"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsMatinActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                <Setter Property="Background" Value="#E3F2FD"/>
+                                                <Setter Property="BorderBrush" Value="#90CAF9"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <views:ShiftReportControl DataContext="{Binding ReportMatin}" IsEnabled="{Binding DataContext.IsMatinEnabled, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Width="*">
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,5" HorizontalAlignment="Stretch">
+                                <TextBlock Text="Après-Midi (12:30 - 20:30)" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="Contrôleur :" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#555555"/>
+                                    <TextBox Width="120" Text="{Binding DataContext.ControllerApresMidi, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}" 
+                                             IsEnabled="{Binding DataContext.IsApresMidiTimeWindow, RelativeSource={RelativeSource AncestorType=Window}}" Padding="2" Background="#FAFAFA"/>
+
+                                    <Button Command="{Binding DataContext.EditTeamCommentCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                            CommandParameter="ApresMidi" Background="Transparent" BorderThickness="0" Margin="5,0,0,0" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="💬" FontSize="14" VerticalAlignment="Center" ToolTip="Ajouter un commentaire d'équipe"/>
+                                            <TextBlock Text="⚠️ ATTENTION" Style="{StaticResource BlinkingAttentionStyle}" 
+                                                       DataContext="{Binding DataContext.TeamCommentApresMidi, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="4" Margin="2">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="2"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsApresMidiActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                <Setter Property="Background" Value="#E3F2FD"/>
+                                                <Setter Property="BorderBrush" Value="#90CAF9"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <views:ShiftReportControl DataContext="{Binding ReportApresMidi}" IsEnabled="{Binding DataContext.IsApresMidiEnabled, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Width="*">
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,5" HorizontalAlignment="Stretch">
+                                <TextBlock Text="Nuit (20:30 - 04:30)" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="Contrôleur :" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#555555"/>
+                                    <TextBox Width="120" Text="{Binding DataContext.ControllerNuit, RelativeSource={RelativeSource AncestorType=Window}, UpdateSourceTrigger=PropertyChanged}" 
+                                             IsEnabled="{Binding DataContext.IsNuitTimeWindow, RelativeSource={RelativeSource AncestorType=Window}}" Padding="2" Background="#FAFAFA"/>
+
+                                    <Button Command="{Binding DataContext.EditTeamCommentCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                            CommandParameter="Nuit" Background="Transparent" BorderThickness="0" Margin="5,0,0,0" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="💬" FontSize="14" VerticalAlignment="Center" ToolTip="Ajouter un commentaire d'équipe"/>
+                                            <TextBlock Text="⚠️ ATTENTION" Style="{StaticResource BlinkingAttentionStyle}" 
+                                                       DataContext="{Binding DataContext.TeamCommentNuit, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="4" Margin="2">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="2"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsNuitActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                <Setter Property="Background" Value="#E3F2FD"/>
+                                                <Setter Property="BorderBrush" Value="#90CAF9"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <views:ShiftReportControl DataContext="{Binding ReportNuit}" IsEnabled="{Binding DataContext.IsNuitEnabled, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>

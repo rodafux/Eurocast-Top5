@@ -1,0 +1,38 @@
+<Window x:Class="Top5.Views.TeamCommentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Consigne d'équipe" Height="350" Width="550" WindowStartupLocation="CenterOwner" Background="#F5F6FA">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="{Binding ShiftName, StringFormat='Consigne pour l équipe : {0}'}" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,10"/>
+
+        <TextBlock Text="Mode Lecture Seule : Cette équipe n'est pas active." Foreground="#E74C3C" FontWeight="Bold" FontStyle="Italic" Margin="0,0,0,10" HorizontalAlignment="Right">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <TextBox Grid.Row="1" Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}" 
+                 AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                 IsReadOnly="{Binding IsReadOnly}"
+                 Padding="10" FontSize="14" BorderBrush="#CBD5E1" BorderThickness="1" />
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="Fermer" Command="{Binding CancelCommand}" Width="100" Height="35" Background="#95A5A6" Foreground="White" FontWeight="Bold" BorderThickness="0" Margin="0,0,10,0" Cursor="Hand"/>
+            <Button Content="💾 Enregistrer" Command="{Binding SaveCommand}" Visibility="{Binding SaveButtonVisibility}" Width="120" Height="35" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+        </StackPanel>
+    </Grid>
+</Window>
