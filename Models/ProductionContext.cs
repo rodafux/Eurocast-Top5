@@ -11,7 +11,9 @@ namespace Top5.Models
         private string _dmsColor = "#DDDDDD";
         private string _lastDMSDateString = "Inconnu";
 
-        // NOUVEAU : Variable de priorité (0 = aucune, 1, 2, 3)
+        // NOUVEAU : Propriété pour stocker la date d'expiration
+        private string _dmsExpirationDateString = "Inconnu";
+
         private int _priority = 0;
 
         public string Machine { get => _machine; set { _machine = value; OnPropertyChanged(); RefreshDMS(); } }
@@ -20,7 +22,9 @@ namespace Top5.Models
         public string DMSColor { get => _dmsColor; set { _dmsColor = value; OnPropertyChanged(); } }
         public string LastDMSDateString { get => _lastDMSDateString; set { _lastDMSDateString = value; OnPropertyChanged(); } }
 
-        // NOUVEAU : Gestion de la priorité
+        // NOUVEAU : Accesseur de la date d'expiration
+        public string DMSExpirationDateString { get => _dmsExpirationDateString; set { _dmsExpirationDateString = value; OnPropertyChanged(); } }
+
         public int Priority
         {
             get => _priority;
@@ -33,22 +37,23 @@ namespace Top5.Models
             }
         }
 
-        // Renvoie une étoile vide si 0, sinon le chiffre
         public string PriorityText => Priority == 0 ? "☆" : Priority.ToString();
 
-        // Renvoie la couleur selon le niveau
         public string PriorityColor => Priority switch
         {
-            1 => "#E74C3C", // Rouge (Urgente)
-            2 => "#E67E22", // Orange (Moyenne)
-            3 => "#F1C40F", // Jaune (Basse)
-            _ => "#DDDDDD"  // Gris (Aucune)
+            1 => "#E74C3C",
+            2 => "#E67E22",
+            3 => "#F1C40F",
+            _ => "#DDDDDD"
         };
 
         public void RefreshDMS()
         {
             DMSColor = DMSService.GetDMSColor(Machine, Piece, Moule);
             LastDMSDateString = DMSService.GetLastDMSDateString(Machine, Piece, Moule);
+
+            // NOUVEAU : Récupération de l'expiration
+            DMSExpirationDateString = DMSService.GetDMSExpirationDateString(Machine, Piece, Moule);
         }
     }
 }

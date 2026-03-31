@@ -8,7 +8,7 @@ using Top5.Utils;
 
 namespace Top5.Services
 {
-    public static class DMSService
+    public class DMSService
     {
         private const string FileName = "historique_DMS.json";
 
@@ -38,7 +38,7 @@ namespace Top5.Services
 
                 history.Add(new DMSEntry
                 {
-                    Timestamp = dmsDate, // Date choisie dans le calendrier
+                    Timestamp = dmsDate,
                     Machine = machine,
                     Piece = piece,
                     Moule = moule,
@@ -113,9 +113,6 @@ namespace Top5.Services
             }
         }
 
-        // =========================================================
-        // NOUVELLE MÉTHODE : Récupère la date formatée du dernier DMS
-        // =========================================================
         public static string GetLastDMSDateString(string machine, string piece, string moule)
         {
             if (piece == "---" || moule == "---") return "Non applicable";
@@ -136,12 +133,41 @@ namespace Top5.Services
 
                 if (lastDMS == null) return "Aucun (Jamais fait)";
 
-                // Renvoie la date au format "Jour/Mois/Année"
                 return lastDMS.Timestamp.ToString("dd/MM/yyyy");
             }
             catch
             {
                 return "Erreur de lecture";
+            }
+        }
+
+        // NOUVEAU : Calcul automatique de l'expiration (+ 30 jours)
+        public static string GetDMSExpirationDateString(string machine, string piece, string moule)
+        {
+            if (piece == "---" || moule == "---") return "N/A";
+
+            try
+            {
+                string filePath = GetFilePath();
+                if (!File.Exists(filePath)) return "N/A";
+
+                string json = File.ReadAllText(filePath);
+                var history = JsonSerializer.Deserialize<List<DMSEntry>>(json);
+
+                if (history == null || history.Count == 0) return "N/A";
+
+                var lastDMS = history.Where(x => x.Machine == machine && x.Piece == piece && x.Moule == moule)
+                                     .OrderByDescending(x => x.Timestamp)
+                                     .FirstOrDefault();
+
+                if (lastDMS == null) return "N/A";
+
+                // Le DMS expire exactement 30 jours après sa réalisation
+                return lastDMS.Timestamp.AddDays(30).ToString("dd/MM/yyyy");
+            }
+            catch
+            {
+                return "Erreur";
             }
         }
     }
