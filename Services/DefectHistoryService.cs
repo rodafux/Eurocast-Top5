@@ -35,7 +35,34 @@ namespace Top5.Services
             {
                 string filePath = Path.Combine(GetDirectoryPath(), GetSafeFileName(piece, moule));
                 if (!File.Exists(filePath)) return new List<DefectHistoryEntry>();
-                return JsonSerializer.Deserialize<List<DefectHistoryEntry>>(File.ReadAllText(filePath)) ?? new List<DefectHistoryEntry>();
+
+                var history = JsonSerializer.Deserialize<List<DefectHistoryEntry>>(File.ReadAllText(filePath)) ?? new List<DefectHistoryEntry>();
+
+                // --- PATCH RÉTROACTIF POUR LES ANCIENS DÉFAUTS ---
+                // Le programme devine la Machine et la Date du DMS pour les vieux fichiers JSON
+                string assumedMachine = "Inconnue";
+                string assumedDmsDate = "Inconnue";
+
+                try
+                {
+                    var latestProds = ProductionHistoryService.GetLatestProductions();
+                    var match = latestProds.FirstOrDefault(x => x.Value.Piece == piece && x.Value.Moule == moule);
+                    if (match.Key != null)
+                    {
+                        assumedMachine = match.Key;
+                        assumedDmsDate = DMSService.GetLastDMSDateString(assumedMachine, piece, moule);
+                    }
+                }
+                catch { }
+
+                foreach (var entry in history)
+                {
+                    if (entry.Machine == "Inconnue") entry.Machine = assumedMachine;
+                    if (entry.DateDms == "Inconnue") entry.DateDms = assumedDmsDate;
+                }
+                // -------------------------------------------------
+
+                return history;
             }
             catch (Exception ex) { Logger.Log($"Erreur LoadHistory : {ex.Message}"); return new List<DefectHistoryEntry>(); }
         }
@@ -59,14 +86,18 @@ namespace Top5.Services
                     Commentaire = defect.Comment,
                     NumeroNoyau = defect.CoreNumber,
                     Action = action,
-                    IdDms = DMSService.GetLatestDMSId(context.Machine, context.Piece, context.Moule)
+                    IdDms = DMSService.GetLatestDMSId(context.Machine, context.Piece, context.Moule),
+
+                    // NOUVEAU : Enregistrement définitif pour les futures actions
+                    Machine = context.Machine,
+                    DateDms = DMSService.GetLastDMSDateString(context.Machine, context.Piece, context.Moule)
                 });
+
                 File.WriteAllText(filePath, JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true }));
             }
             catch (Exception ex) { Logger.Log($"Erreur LogDefectAction : {ex.Message}"); }
         }
 
-        // --- MÉTHODE RÉTABLIE POUR LE TRANSFERT D'ÉQUIPE ---
         public static List<Defect> GetUnresolvedDefects(string piece, string moule)
         {
             var unresolved = new List<Defect>();
@@ -110,7 +141,7 @@ namespace Top5.Services
                 int days = config.NoyauAlertDays <= 0 ? 7 : config.NoyauAlertDays;
                 DateTime thresholdDate = DateTime.Now.Date.AddDays(-days);
 
-                var history = LoadHistory(piece, moule);
+                var history = LoadHistory(piece, moule); // Utilise LoadHistory avec le patch rétroactif
                 string targetCore = coreNumber.Trim();
                 var groupedHistory = history.GroupBy(h => h.Id);
 

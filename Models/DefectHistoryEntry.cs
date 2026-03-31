@@ -10,12 +10,27 @@ namespace Top5.Models
         [JsonIgnore]
         public string ShortId => $"{Id.ToString().Substring(0, 8)}...";
 
-        // NOUVEAU : Sauvegarde de l'ID du DMS lié
+        // Gardé pour la compatibilité avec tes anciens fichiers JSON
         public string IdDms { get; set; } = string.Empty;
 
-        // NOUVEAU : Formatage visuel de l'ID du DMS
         [JsonIgnore]
         public string ShortIdDms => string.IsNullOrEmpty(IdDms) ? "Aucun" : $"{IdDms.Substring(0, 8)}...";
+
+        // --- NOUVELLES DONNÉES ---
+        private string _machine = string.Empty;
+        public string Machine
+        {
+            get => string.IsNullOrEmpty(_machine) ? "Inconnue" : _machine;
+            set => _machine = value;
+        }
+
+        private string _dateDms = string.Empty;
+        public string DateDms
+        {
+            get => string.IsNullOrEmpty(_dateDms) ? "Inconnue" : _dateDms;
+            set => _dateDms = value;
+        }
+        // -------------------------
 
         public string Date { get; set; } = string.Empty;
         public string Heure { get; set; } = string.Empty;
