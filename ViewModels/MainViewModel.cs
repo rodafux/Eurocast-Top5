@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using Top5.Models;
@@ -28,11 +29,7 @@ namespace Top5.ViewModels
             get => _viewingDate;
             set
             {
-                // BLOCAGE : Impossible d'aller au-delà d'aujourd'hui
-                if (value.Date > DateTime.Today)
-                {
-                    value = DateTime.Today;
-                }
+                if (value.Date > DateTime.Today) value = DateTime.Today;
 
                 if (_viewingDate != value)
                 {
@@ -54,10 +51,7 @@ namespace Top5.ViewModels
                 try
                 {
                     var newDate = new DateTime(ViewingDate.Year, 1, 1).AddDays(value - 1);
-                    if (newDate.Date <= DateTime.Today)
-                    {
-                        ViewingDate = newDate;
-                    }
+                    if (newDate.Date <= DateTime.Today) ViewingDate = newDate;
                 }
                 catch { }
             }
@@ -74,7 +68,7 @@ namespace Top5.ViewModels
         public string TeamCommentNuit { get => _teamCommentNuit; set { _teamCommentNuit = value; OnPropertyChanged(); } }
         #endregion
 
-        #region Logique des Shifts avec BATTEMENT DE 10 MINUTES
+        #region Logique des Shifts
         public bool IsMatinActive => IsCurrentDay && IsTimeBetween(new TimeSpan(4, 30, 0), new TimeSpan(12, 30, 0));
         public bool IsApresMidiActive => IsCurrentDay && IsTimeBetween(new TimeSpan(12, 30, 0), new TimeSpan(20, 30, 0));
         public bool IsNuitActive => IsCurrentDay && (IsTimeBetween(new TimeSpan(20, 30, 0), new TimeSpan(23, 59, 59)) || IsTimeBetween(new TimeSpan(0, 0, 0), new TimeSpan(4, 30, 0)));
@@ -106,12 +100,8 @@ namespace Top5.ViewModels
         #region Commands
         public ICommand PreviousDayCommand => new RelayCommand(_ => ViewingDate = ViewingDate.AddDays(-1));
 
-        // Double sécurité : On vérifie avant d'incrémenter
         public ICommand NextDayCommand => new RelayCommand(_ => {
-            if (ViewingDate.Date < DateTime.Today)
-            {
-                ViewingDate = ViewingDate.AddDays(1);
-            }
+            if (ViewingDate.Date < DateTime.Today) ViewingDate = ViewingDate.AddDays(1);
         });
 
         public ICommand GoToTodayCommand => new RelayCommand(_ => ViewingDate = DateTime.Today);
@@ -176,7 +166,6 @@ namespace Top5.ViewModels
         });
 
         public ICommand OpenProductionHistoryCommand => new RelayCommand(_ => {
-            // CORRECTION : Instanciation et liaison du ViewModel manquant
             var vm = new ProductionHistoryViewModel();
             var win = new Top5.Views.ProductionHistoryWindow { DataContext = vm, Owner = Application.Current.MainWindow };
             win.ShowDialog();
@@ -194,8 +183,28 @@ namespace Top5.ViewModels
         });
         #endregion
 
+        // --- CONSTRUCTEUR STANDARD (UI) ---
         public MainViewModel()
         {
+            LoadDateData();
+
+            // CORRECTION ARCHITECTURE : Tâche asynchrone sécurisée
+            _ = RunStartupTasksAsync();
+        }
+
+        private async Task RunStartupTasksAsync()
+        {
+            // On laisse 2 pleines secondes à WPF pour afficher son interface à l'utilisateur
+            await Task.Delay(2000);
+
+            // On lance la vérification intelligente des PDF manquants (au ralenti, sans freeze)
+            Top5HistoryService.ExportMissingPdfsAsync(DateTime.Today, startAtPastDay: false);
+        }
+
+        // --- CONSTRUCTEUR SILENCIEUX (BACKGROUND PDF) ---
+        public MainViewModel(DateTime backgroundDate)
+        {
+            _viewingDate = backgroundDate;
             LoadDateData();
         }
 
@@ -211,16 +220,12 @@ namespace Top5.ViewModels
                 }
             }
 
-            bool fileLoaded = Top5HistoryService.LoadDailyReport(this, ViewingDate);
+            bool fileLoaded = Top5HistoryService.LoadDailyReport(this, _viewingDate);
 
             if (!fileLoaded)
             {
-                ControllerMatin = "";
-                ControllerApresMidi = "";
-                ControllerNuit = "";
-                TeamCommentMatin = "";
-                TeamCommentApresMidi = "";
-                TeamCommentNuit = "";
+                ControllerMatin = ""; ControllerApresMidi = ""; ControllerNuit = "";
+                TeamCommentMatin = ""; TeamCommentApresMidi = ""; TeamCommentNuit = "";
 
                 var latestStates = ProductionHistoryService.GetLatestProductions();
                 foreach (var row in ProductionRows)
@@ -235,10 +240,7 @@ namespace Top5.ViewModels
                         if (unresolvedDefects.Count > 0)
                         {
                             var activeShift = GetActiveShift(row);
-                            foreach (var defect in unresolvedDefects)
-                            {
-                                activeShift.Defects.Add(defect);
-                            }
+                            foreach (var defect in unresolvedDefects) activeShift.Defects.Add(defect);
                         }
                     }
                 }
@@ -254,9 +256,6 @@ namespace Top5.ViewModels
 
         public void ForceSave()
         {
-            // CORRECTION : Protection stricte contre la création de fichiers "fantômes"
-            // On ne sauvegarde QUE si la date visionnée est la date du jour. 
-            // Les dates passées sont en lecture seule.
             if (_viewingDate.Date == DateTime.Today)
             {
                 Top5HistoryService.SaveDailyReport(this, _viewingDate);

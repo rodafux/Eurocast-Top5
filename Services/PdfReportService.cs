@@ -1,27 +1,39 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+
+// ==========================================================
+// ALIAS : Résolution des conflits entre WPF et QuestPDF
+// ==========================================================
+using QColors = QuestPDF.Helpers.Colors;
+using QFonts = QuestPDF.Helpers.Fonts;
+using WpfColor = System.Windows.Media.Color;
+
 using Top5.Models;
 using Top5.ViewModels;
+using Top5.Utils; // Pour utiliser le Logger
 
 namespace Top5.Services
 {
-    /// <summary>
-    /// Service de génération de rapport PDF (FlowDocument).
-    /// Version Ultra-Compacte avec système de "Badges" visuels pour les états DMS et Défauts.
-    /// </summary>
     public static class PdfReportService
     {
+        // =================================================================================
+        // PARTIE 1 : MOTEUR WPF (Utilisé UNIQUEMENT pour l'Aperçu à l'écran via PdfPreviewWindow)
+        // =================================================================================
         public static FlowDocument CreateDocument(MainViewModel vm)
         {
-            FlowDocument doc = new FlowDocument { FontFamily = new FontFamily("Segoe UI"), FontSize = 12 };
+            FlowDocument doc = new FlowDocument { FontFamily = new System.Windows.Media.FontFamily("Segoe UI"), FontSize = 12 };
             doc.PagePadding = new Thickness(15);
             doc.PageWidth = 793.7;
             doc.PageHeight = 1122.5;
             doc.ColumnWidth = doc.PageWidth - doc.PagePadding.Left - doc.PagePadding.Right;
 
-            // --- TITRE DU RAPPORT ---
             Paragraph title = new Paragraph();
             title.TextAlignment = TextAlignment.Center;
             title.Margin = new Thickness(0, 0, 0, 10);
@@ -31,7 +43,6 @@ namespace Top5.Services
             title.Inlines.Add(new Run($"{vm.ViewingDate:dd/MM/yyyy} — Jour : {vm.ViewingDayOfYear}") { FontSize = 16, Foreground = Brushes.DimGray });
             doc.Blocks.Add(title);
 
-            // --- SECTION CONSIGNES D'ÉQUIPES ---
             if (!string.IsNullOrWhiteSpace(vm.TeamCommentMatin) ||
                 !string.IsNullOrWhiteSpace(vm.TeamCommentApresMidi) ||
                 !string.IsNullOrWhiteSpace(vm.TeamCommentNuit))
@@ -40,7 +51,7 @@ namespace Top5.Services
                 commentTable.Columns.Add(new TableColumn());
                 TableRowGroup crg = new TableRowGroup();
 
-                TableRow trTitle = new TableRow { Background = new SolidColorBrush(Color.FromRgb(250, 235, 235)) };
+                TableRow trTitle = new TableRow { Background = new SolidColorBrush(WpfColor.FromRgb(250, 235, 235)) };
                 trTitle.Cells.Add(new TableCell(new Paragraph(new Run("⚠️ CONSIGNES D'ÉQUIPES DU JOUR")) { FontWeight = FontWeights.Bold, Foreground = Brushes.DarkRed, Padding = new Thickness(4), FontSize = 13 }));
                 crg.Rows.Add(trTitle);
 
@@ -52,12 +63,11 @@ namespace Top5.Services
                 doc.Blocks.Add(commentTable);
             }
 
-            // --- BOUCLE SUR LES MACHINES ---
             foreach (var row in vm.ProductionRows)
             {
                 if (row.Production.Piece == "---" && row.Production.Moule == "---") continue;
 
-                Paragraph machineHeader = new Paragraph { Background = new SolidColorBrush(Color.FromRgb(235, 237, 239)), Padding = new Thickness(3), Margin = new Thickness(0, 6, 0, 0) };
+                Paragraph machineHeader = new Paragraph { Background = new SolidColorBrush(WpfColor.FromRgb(235, 237, 239)), Padding = new Thickness(3), Margin = new Thickness(0, 6, 0, 0) };
                 machineHeader.Inlines.Add(new Run($" {row.Production.Machine} | Pièce: {row.Production.Piece} | Moule: {row.Production.Moule}   ") { FontWeight = FontWeights.Bold, FontSize = 14 });
 
                 string dmsStatus = GetDmsText(row.Production.DMSColor);
@@ -65,7 +75,6 @@ namespace Top5.Services
                 Brush dmsFgBrush = GetForegroundBrush(row.Production.DMSColor);
 
                 machineHeader.Inlines.Add(new Run(" DMS : ") { Foreground = Brushes.DarkSlateGray, FontWeight = FontWeights.Bold, FontSize = 12 });
-                // BADGE DMS : Remplacement de la pastille par un bloc de fond coloré
                 machineHeader.Inlines.Add(new Run($" {dmsStatus} ") { Background = dmsBgBrush, Foreground = dmsFgBrush, FontWeight = FontWeights.Bold, FontSize = 12 });
                 machineHeader.Inlines.Add(new Run($" (Expire le {row.Production.DMSExpirationDateString})") { Foreground = Brushes.DarkSlateGray, FontWeight = FontWeights.SemiBold, FontSize = 12 });
 
@@ -140,7 +149,6 @@ namespace Top5.Services
 
                     Paragraph pDefect = new Paragraph { Margin = new Thickness(0, 2, 0, 0), FontSize = 11 };
 
-                    // BADGE DÉFAUT : Bloc de fond coloré avec le texte de l'état
                     pDefect.Inlines.Add(new Run($" {d.State} ") { Background = badgeBg, Foreground = badgeFg, FontWeight = FontWeights.Bold, FontSize = 10 });
                     pDefect.Inlines.Add(new Run($" {d.DefectType}{noyau}") { FontWeight = FontWeights.SemiBold });
 
@@ -167,10 +175,10 @@ namespace Top5.Services
         {
             Brush bgBrush = Brushes.LightGray;
 
-            if (state == "B") bgBrush = new SolidColorBrush(Color.FromRgb(46, 204, 113));
-            else if (state == "AA") bgBrush = new SolidColorBrush(Color.FromRgb(243, 156, 18));
-            else if (state == "NC") bgBrush = new SolidColorBrush(Color.FromRgb(231, 76, 60));
-            else bgBrush = new SolidColorBrush(Color.FromRgb(220, 220, 220));
+            if (state == "B") bgBrush = new SolidColorBrush(WpfColor.FromRgb(46, 204, 113));
+            else if (state == "AA") bgBrush = new SolidColorBrush(WpfColor.FromRgb(243, 156, 18));
+            else if (state == "NC") bgBrush = new SolidColorBrush(WpfColor.FromRgb(231, 76, 60));
+            else bgBrush = new SolidColorBrush(WpfColor.FromRgb(220, 220, 220));
 
             Paragraph p = new Paragraph { TextAlignment = TextAlignment.Center, Margin = new Thickness(0) };
             p.Inlines.Add(new Run($"{label}") { FontWeight = FontWeights.Bold, FontSize = 10.5 });
@@ -178,23 +186,12 @@ namespace Top5.Services
             return new TableCell(p) { Background = bgBrush, BorderBrush = Brushes.DarkGray, BorderThickness = new Thickness(0.5), Padding = new Thickness(1) };
         }
 
-        private static string GetControllerName(string name) => string.IsNullOrWhiteSpace(name) ? "?" : name;
-
-        private static string GetDmsText(string hex)
-        {
-            if (hex == "#2ECC71") return "À jour";
-            if (hex == "#F39C12") return "Expire bientôt";
-            if (hex == "#E74C3C") return "Expiré";
-            return "N/A";
-        }
-
         private static SolidColorBrush GetBrushFromHex(string hex)
         {
-            try { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); }
+            try { return new SolidColorBrush((WpfColor)ColorConverter.ConvertFromString(hex)); }
             catch { return Brushes.Black; }
         }
 
-        // Utilitaire pour s'assurer que le texte dans le badge est lisible (Blanc sur couleur, Noir sur gris clair)
         private static Brush GetForegroundBrush(string hex)
         {
             if (hex == "#DDDDDD") return Brushes.Black;
@@ -207,5 +204,150 @@ namespace Top5.Services
             p.Inlines.Add(new Run(text) { FontWeight = FontWeights.Bold, FontSize = 12, Foreground = Brushes.White });
             return new TableCell(p) { BorderBrush = Brushes.DarkGray, BorderThickness = new Thickness(1) };
         }
+
+
+        // =================================================================================
+        // PARTIE 2 : MOTEUR QUESTPDF (Utilisé UNIQUEMENT en arrière-plan pour l'exportation auto)
+        // =================================================================================
+
+        public static void GeneratePdf(MainViewModel vm, string filePath)
+        {
+            try
+            {
+                // SÉCURITÉ : On garantit l'activation de la licence juste avant la génération
+                QuestPDF.Settings.License = LicenseType.Community;
+
+                var doc = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(PageSizes.A4);
+                        page.Margin(15, Unit.Point);
+                        page.PageColor(QColors.White);
+
+                        // Laisse QuestPDF gérer ses polices natives pour éviter les crashs
+                        page.DefaultTextStyle(x => x.FontSize(10));
+
+                        page.Content().Column(col =>
+                        {
+                            col.Item().AlignCenter().Text("Rapport de Production Top 5").Bold().FontSize(20);
+                            col.Item().AlignCenter().PaddingBottom(10).Text($"{vm.ViewingDate:dd/MM/yyyy} — Jour : {vm.ViewingDayOfYear}").FontSize(14).FontColor(QColors.Grey.Darken2);
+
+                            bool hasConsignes = !string.IsNullOrWhiteSpace(vm.TeamCommentMatin) || !string.IsNullOrWhiteSpace(vm.TeamCommentApresMidi) || !string.IsNullOrWhiteSpace(vm.TeamCommentNuit);
+                            if (hasConsignes)
+                            {
+                                col.Item().PaddingBottom(10).Border(1).BorderColor(QColors.Red.Darken2).Column(c =>
+                                {
+                                    c.Item().Background(QColors.Red.Lighten4).Padding(4).Text("⚠️ CONSIGNES D'ÉQUIPES DU JOUR").Bold().FontColor(QColors.Red.Darken4);
+                                    if (!string.IsNullOrWhiteSpace(vm.TeamCommentMatin)) c.Item().Padding(4).Text(t => { t.Span("Matin : ").Bold(); t.Span(vm.TeamCommentMatin); });
+                                    if (!string.IsNullOrWhiteSpace(vm.TeamCommentApresMidi)) c.Item().Padding(4).Text(t => { t.Span("Après-Midi : ").Bold(); t.Span(vm.TeamCommentApresMidi); });
+                                    if (!string.IsNullOrWhiteSpace(vm.TeamCommentNuit)) c.Item().Padding(4).Text(t => { t.Span("Nuit : ").Bold(); t.Span(vm.TeamCommentNuit); });
+                                });
+                            }
+
+                            foreach (var row in vm.ProductionRows.Where(r => r.Production.Piece != "---" && r.Production.Moule != "---"))
+                            {
+                                col.Item().PaddingTop(5).Background(QColors.Grey.Lighten4).Padding(4).Row(r =>
+                                {
+                                    r.RelativeItem().Text($" {row.Production.Machine} | Pièce: {row.Production.Piece} | Moule: {row.Production.Moule}   ").Bold().FontSize(12);
+
+                                    string dmsStatus = GetDmsText(row.Production.DMSColor);
+                                    string dmsBg = row.Production.DMSColor ?? "#DDDDDD";
+                                    string dmsFg = dmsBg == "#DDDDDD" ? QColors.Black : QColors.White;
+
+                                    r.AutoItem().PaddingRight(5).Text(" DMS : ").Bold().FontColor(QColors.Grey.Darken3);
+                                    r.AutoItem().Background(dmsBg).PaddingHorizontal(4).Text(dmsStatus).Bold().FontColor(dmsFg);
+                                    r.AutoItem().Text($" (Expire le {row.Production.DMSExpirationDateString})").FontColor(QColors.Grey.Darken3);
+                                });
+
+                                col.Item().PaddingBottom(5).Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns => { columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn(); });
+
+                                    table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Background(QColors.Grey.Darken1).Padding(2).AlignCenter().Text($"Matin ({GetControllerName(vm.ControllerMatin)})").Bold().FontColor(QColors.White);
+                                    table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Background(QColors.Grey.Darken1).Padding(2).AlignCenter().Text($"A-Midi ({GetControllerName(vm.ControllerApresMidi)})").Bold().FontColor(QColors.White);
+                                    table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Background(QColors.Grey.Darken1).Padding(2).AlignCenter().Text($"Nuit ({GetControllerName(vm.ControllerNuit)})").Bold().FontColor(QColors.White);
+
+                                    table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Padding(2).Element(e => DrawShift(e, row.ReportMatin));
+                                    table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Padding(2).Element(e => DrawShift(e, row.ReportApresMidi));
+                                    table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Padding(2).Element(e => DrawShift(e, row.ReportNuit));
+                                });
+                            }
+                        });
+                    });
+                });
+
+                doc.GeneratePdf(filePath);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ERREUR FATALE QUESTPDF : {ex.Message} \n {ex.StackTrace}");
+
+                // ANTI-FICHIERS CORROMPUS : Si le rendu plante, on détruit le fichier 0 Ko.
+                if (File.Exists(filePath))
+                {
+                    try { File.Delete(filePath); } catch { }
+                }
+            }
+        }
+
+        private static void DrawShift(IContainer container, ShiftReport report)
+        {
+            if (report == null) return;
+
+            container.Column(col =>
+            {
+                col.Item().PaddingBottom(2).Table(t =>
+                {
+                    t.ColumnsDefinition(c => { c.RelativeColumn(); c.RelativeColumn(); c.RelativeColumn(); });
+                    t.Cell().Element(e => DrawStatusBadge(e, "RX", report.RXState.ToString()));
+                    t.Cell().Element(e => DrawStatusBadge(e, "3D", report.DimensionalState.ToString()));
+                    t.Cell().Element(e => DrawStatusBadge(e, "AC", report.AspectState.ToString()));
+                });
+
+                col.Item().PaddingBottom(2).Text($"Avis NC : {report.AncCount}").SemiBold().FontSize(9);
+
+                if (report.Defects != null && report.Defects.Any())
+                {
+                    col.Item().Text("Défauts :").Bold().FontColor(QColors.Red.Darken3).FontSize(9);
+                    foreach (var d in report.Defects)
+                    {
+                        string noyau = string.IsNullOrEmpty(d.CoreNumber) ? "" : $" [Nº {d.CoreNumber}]";
+                        string stateHex = d.State.ToString() switch { "B" => "#2ECC71", "AA" => "#F39C12", "NC" => "#E74C3C", _ => "#DDDDDD" };
+                        string fgColor = stateHex == "#DDDDDD" ? QColors.Black : QColors.White;
+
+                        col.Item().PaddingTop(2).Row(r =>
+                        {
+                            r.AutoItem().Background(stateHex).PaddingHorizontal(3).Text(d.State.ToString()).Bold().FontSize(8).FontColor(fgColor);
+                            r.AutoItem().PaddingLeft(3).Text($"{d.DefectType}{noyau}").SemiBold().FontSize(9);
+                        });
+
+                        if (!string.IsNullOrWhiteSpace(d.Comment))
+                        {
+                            col.Item().PaddingLeft(10).Text($"> {d.Comment}").Italic().FontSize(8).FontColor(QColors.Grey.Darken2);
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(report.GeneralComment))
+                {
+                    col.Item().PaddingTop(2).Text($"Obs : {report.GeneralComment}").Italic().FontSize(9).FontColor(QColors.Grey.Darken3);
+                }
+            });
+        }
+
+        private static void DrawStatusBadge(IContainer container, string label, string state)
+        {
+            string bgBrush = QColors.Grey.Lighten2;
+            if (state == "B") bgBrush = "#2ECC71";
+            else if (state == "AA") bgBrush = "#F39C12";
+            else if (state == "NC") bgBrush = "#E74C3C";
+
+            container.Border(0.5f).BorderColor(QColors.Grey.Medium).Background(bgBrush).Padding(1).AlignCenter().Text(label).Bold().FontSize(9).FontColor(QColors.Black);
+        }
+
+        // --- METHODES UTILITAIRES PARTAGEES (Communes aux deux moteurs) ---
+        private static string GetControllerName(string name) => string.IsNullOrWhiteSpace(name) ? "?" : name;
+        private static string GetDmsText(string hex) => hex == "#2ECC71" ? "À jour" : hex == "#F39C12" ? "Expire bientôt" : hex == "#E74C3C" ? "Expiré" : "N/A";
     }
 }

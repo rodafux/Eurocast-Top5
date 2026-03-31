@@ -3,14 +3,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Top5.Models;
 using Top5.Utils;
 using Top5.ViewModels;
 
 namespace Top5.Services
 {
+    /// <summary>
+    /// Service responsable de la sauvegarde, du chargement et de l'exportation des historiques de production.
+    /// Entièrement Thread-Safe (Compatible avec QuestPDF pour la génération en arrière-plan).
+    /// </summary>
     public static class Top5HistoryService
     {
+        // Gère le décalage horaire (la journée de production commence à 04h30)
         public static DateTime GetLogicalProductionDate(DateTime realTime)
         {
             return realTime.AddHours(-4).AddMinutes(-30).Date;
@@ -40,12 +46,9 @@ namespace Top5.Services
                     ControllerMatin = vm.ControllerMatin,
                     ControllerApresMidi = vm.ControllerApresMidi,
                     ControllerNuit = vm.ControllerNuit,
-
-                    // Sauvegarde des commentaires
                     TeamCommentMatin = vm.TeamCommentMatin,
                     TeamCommentApresMidi = vm.TeamCommentApresMidi,
                     TeamCommentNuit = vm.TeamCommentNuit,
-
                     Rows = vm.ProductionRows.Select(row => new ProductionRowDTO
                     {
                         Machine = row.Production.Machine,
@@ -59,9 +62,20 @@ namespace Top5.Services
 
                 string path = GetFilePath(prodDate);
                 var opts = new JsonSerializerOptions { WriteIndented = true };
+
+                // 1. Sauvegarde physique des données (JSON)
                 File.WriteAllText(path, JsonSerializer.Serialize(dto, opts));
+
+                // 2. Génération immédiate et garantie du PDF pour le jour actuel
+                ExportPdfSync(vm, prodDate);
+
+                // 3. Déclenchement de la vérification asynchrone pour les archives PDF manquantes
+                ExportMissingPdfsAsync(prodDate, startAtPastDay: true);
             }
-            catch (Exception ex) { Logger.Log($"Erreur de sauvegarde auto du TOP5 : {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erreur de sauvegarde auto du TOP5 : {ex.Message}");
+            }
         }
 
         public static bool LoadDailyReport(MainViewModel vm, DateTime prodDate)
@@ -78,8 +92,6 @@ namespace Top5.Services
                 vm.ControllerMatin = dto.ControllerMatin ?? "";
                 vm.ControllerApresMidi = dto.ControllerApresMidi ?? "";
                 vm.ControllerNuit = dto.ControllerNuit ?? "";
-
-                // Chargement des commentaires
                 vm.TeamCommentMatin = dto.TeamCommentMatin ?? "";
                 vm.TeamCommentApresMidi = dto.TeamCommentApresMidi ?? "";
                 vm.TeamCommentNuit = dto.TeamCommentNuit ?? "";
@@ -107,6 +119,76 @@ namespace Top5.Services
             }
         }
 
+        // --- EXPORT PDF SYNCHRONE (Jour Courant) ---
+        private static void ExportPdfSync(MainViewModel vm, DateTime prodDate)
+        {
+            var config = ConfigurationService.Load();
+            if (string.IsNullOrWhiteSpace(config.PdfExportPath) || config.PdfExportDays <= 0) return;
+
+            string fileName = $"TOP5_{prodDate:yy_MM_dd}-J{prodDate.DayOfYear}.pdf";
+            string fullPath = Path.Combine(config.PdfExportPath, fileName);
+
+            try
+            {
+                // Génération ultra-rapide en RAM via QuestPDF
+                PdfReportService.GeneratePdf(vm, fullPath);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erreur d'export PDF synchrone : {ex.Message}");
+            }
+        }
+
+        // --- EXPORT PDF ASYNCHRONE PURE (Archives et Démarrage) ---
+        public static void ExportMissingPdfsAsync(DateTime currentProdDate, bool startAtPastDay = false)
+        {
+            var config = ConfigurationService.Load();
+            if (string.IsNullOrWhiteSpace(config.PdfExportPath) || config.PdfExportDays <= 0) return;
+
+            if (!Directory.Exists(config.PdfExportPath))
+            {
+                try { Directory.CreateDirectory(config.PdfExportPath); }
+                catch { return; }
+            }
+
+            // Exécution dans un véritable Thread d'arrière-plan sans lien avec l'UI
+            Task.Run(() =>
+            {
+                int startIndex = startAtPastDay ? 1 : 0;
+
+                for (int i = startIndex; i < config.PdfExportDays; i++)
+                {
+                    DateTime dateToProcess = currentProdDate.AddDays(-i);
+                    string fileName = $"TOP5_{dateToProcess:yy_MM_dd}-J{dateToProcess.DayOfYear}.pdf";
+                    string fullPath = Path.Combine(config.PdfExportPath, fileName);
+
+                    // Si le PDF d'archive existe déjà, on l'ignore
+                    if (i > 0 && File.Exists(fullPath)) continue;
+
+                    // Si nous n'avons pas la donnée source JSON pour cette date, on l'ignore
+                    if (!File.Exists(GetFilePath(dateToProcess))) continue;
+
+                    try
+                    {
+                        // Instanciation "silencieuse" du ViewModel pour charger les données du passé
+                        var tempVm = new MainViewModel(dateToProcess);
+
+                        // Création du PDF (Safe : Aucune interaction avec WPF n'est nécessaire)
+                        PdfReportService.GeneratePdf(tempVm, fullPath);
+                    }
+                    catch (IOException)
+                    {
+                        // Le fichier PDF est peut-être ouvert par quelqu'un d'autre sur le réseau. On l'ignore.
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Erreur export PDF background ({fileName}) : {ex.Message}");
+                    }
+                }
+            });
+        }
+
+        // --- UTILITAIRES DE MAPPING (DTO) ---
         private static ShiftReportDTO MapShift(ShiftReport shift)
         {
             return new ShiftReportDTO

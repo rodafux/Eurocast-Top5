@@ -22,9 +22,22 @@ namespace Top5.ViewModels
             set { _config.NoyauAlertDays = value; OnPropertyChanged(); }
         }
 
+        // NOUVEAU : Propriétés pour le PDF
+        public string PdfExportPath
+        {
+            get => _config.PdfExportPath;
+            set { _config.PdfExportPath = value; OnPropertyChanged(); }
+        }
+
+        public int PdfExportDays
+        {
+            get => _config.PdfExportDays;
+            set { _config.PdfExportDays = value; OnPropertyChanged(); }
+        }
+
         public ICommand SaveCommand { get; }
         public ICommand CancelCommand { get; }
-        public Action? CloseAction { get; set; } // Ajout du ?
+        public Action? CloseAction { get; set; }
 
         public ConfigurationViewModel()
         {
@@ -33,7 +46,7 @@ namespace Top5.ViewModels
             CancelCommand = new RelayCommand(_ => CloseAction?.Invoke());
         }
 
-        private void ExecuteSave(object? obj) // Ajout du ?
+        private void ExecuteSave(object? obj)
         {
             ConfigurationService.Save(_config);
             CloseAction?.Invoke();

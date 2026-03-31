@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using QuestPDF.Infrastructure; // NOUVEAU
 
 namespace Top5
 {
@@ -6,8 +7,10 @@ namespace Top5
     {
         protected override void OnStartup(StartupEventArgs e)
         {
+            // NOUVEAU : Configuration de QuestPDF
+            QuestPDF.Settings.License = LicenseType.Community;
+
             base.OnStartup(e);
-            Utils.Logger.Log("Démarrage de l'application Top5.");
         }
     }
 }
