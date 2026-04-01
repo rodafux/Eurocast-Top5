@@ -1,7 +1,7 @@
 <Window x:Class="Top5.Views.ConfigurationWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Configuration Globale" Height="400" Width="550" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+        Title="Configuration Globale" Height="500" Width="550" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
 
     <Grid Margin="15">
         <Grid.RowDefinitions>
@@ -23,16 +23,40 @@
                 </StackPanel>
             </StackPanel>
 
-            <StackPanel Margin="0,25,0,0">
+            <StackPanel Margin="0,20,0,0">
                 <TextBlock Text="Dossier d'export automatique des PDF :" FontWeight="Bold" Foreground="#333333" Margin="0,0,0,5"/>
-                <TextBox Text="{Binding PdfExportPath}" Height="25" Padding="2" ToolTip="Chemin du dossier pour les rapports PDF."/>
-                <TextBlock Text="Laissez vide pour désactiver l'export PDF automatique." FontStyle="Italic" Foreground="Gray" FontSize="11" Margin="0,2,0,0"/>
-
+                <TextBox Text="{Binding PdfExportPath}" Height="25" Padding="2"/>
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                     <TextBlock Text="Générer / vérifier automatiquement les PDF des" VerticalAlignment="Center" Margin="0,0,5,0"/>
                     <TextBox Text="{Binding PdfExportDays}" Width="40" TextAlignment="Center" Padding="2"/>
                     <TextBlock Text="derniers jours." VerticalAlignment="Center" Margin="5,0,0,0"/>
                 </StackPanel>
+            </StackPanel>
+
+            <StackPanel Margin="0,20,0,0">
+                <TextBlock Text="Horaires de début des équipes (Format HH:mm) :" FontWeight="Bold" Foreground="#333333" Margin="0,0,0,5"/>
+                <TextBlock Text="Les équipes s'enchaînent automatiquement. (Pas de chevauchement possible)" FontStyle="Italic" Foreground="Gray" FontSize="11" Margin="0,0,0,10"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Début Matin :" VerticalAlignment="Center" Margin="0,0,10,5"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ShiftMatinStart}" Width="60" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Début Après-Midi :" VerticalAlignment="Center" Margin="0,0,10,5"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ShiftApresMidiStart}" Width="60" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Début Nuit :" VerticalAlignment="Center" Margin="0,0,10,5"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ShiftNuitStart}" Width="60" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                </Grid>
             </StackPanel>
         </StackPanel>
 

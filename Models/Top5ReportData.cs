@@ -10,7 +10,6 @@ namespace Top5.Models
         public string ControllerApresMidi { get; set; } = string.Empty;
         public string ControllerNuit { get; set; } = string.Empty;
 
-        // NOUVEAU : On ajoute les commentaires à votre format de sauvegarde !
         public string TeamCommentMatin { get; set; } = string.Empty;
         public string TeamCommentApresMidi { get; set; } = string.Empty;
         public string TeamCommentNuit { get; set; } = string.Empty;
@@ -23,6 +22,10 @@ namespace Top5.Models
         public string Machine { get; set; } = string.Empty;
         public string Piece { get; set; } = string.Empty;
         public string Moule { get; set; } = string.Empty;
+
+        // NOUVEAU : Sauvegarde de la priorité
+        public int Priority { get; set; } = 0;
+
         public ShiftReportDTO Matin { get; set; } = new ShiftReportDTO();
         public ShiftReportDTO ApresMidi { get; set; } = new ShiftReportDTO();
         public ShiftReportDTO Nuit { get; set; } = new ShiftReportDTO();

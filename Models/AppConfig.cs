@@ -2,14 +2,16 @@
 {
     public class AppConfig
     {
-        // Chemin du dossier partagé réseau (par défaut vide = Mes Documents)
         public string DatabasePath { get; set; } = string.Empty;
-
-        // Nombre de jours pour l'analyse de l'historique des noyaux (7 par défaut)
         public int NoyauAlertDays { get; set; } = 7;
 
-        // NOUVEAU : Configuration de l'export PDF automatique
         public string PdfExportPath { get; set; } = string.Empty;
         public int PdfExportDays { get; set; } = 3;
+
+        // NOUVEAU : Horaires de début des équipes (Format HH:mm)
+        // La fin d'une équipe est implicitement le début de la suivante.
+        public string ShiftMatinStart { get; set; } = "04:30";
+        public string ShiftApresMidiStart { get; set; } = "12:30";
+        public string ShiftNuitStart { get; set; } = "20:30";
     }
 }

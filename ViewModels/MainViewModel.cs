@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Top5.Models;
 using Top5.Services;
 using Top5.Utils;
@@ -12,7 +13,7 @@ namespace Top5.ViewModels
 {
     public class MainViewModel : ViewModelBase
     {
-        private DateTime _viewingDate = DateTime.Today;
+        private DateTime _viewingDate;
         private string _controllerMatin = "";
         private string _controllerApresMidi = "";
         private string _controllerNuit = "";
@@ -20,6 +21,11 @@ namespace Top5.ViewModels
         private string _teamCommentMatin = "";
         private string _teamCommentApresMidi = "";
         private string _teamCommentNuit = "";
+
+        // Timers d'arrière-plan
+        private DispatcherTimer _shiftCheckTimer;
+        private DispatcherTimer _autoSaveTimer;
+        private string _currentActiveShiftName = "";
 
         public ObservableCollection<ProductionRow> ProductionRows { get; set; } = new ObservableCollection<ProductionRow>();
 
@@ -29,7 +35,8 @@ namespace Top5.ViewModels
             get => _viewingDate;
             set
             {
-                if (value.Date > DateTime.Today) value = DateTime.Today;
+                var todayLogical = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
+                if (value.Date > todayLogical) value = todayLogical;
 
                 if (_viewingDate != value)
                 {
@@ -51,13 +58,14 @@ namespace Top5.ViewModels
                 try
                 {
                     var newDate = new DateTime(ViewingDate.Year, 1, 1).AddDays(value - 1);
-                    if (newDate.Date <= DateTime.Today) ViewingDate = newDate;
+                    var todayLogical = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
+                    if (newDate.Date <= todayLogical) ViewingDate = newDate;
                 }
                 catch { }
             }
         }
 
-        public bool IsCurrentDay => ViewingDate.Date == DateTime.Today;
+        public bool IsCurrentDay => ViewingDate.Date == Top5HistoryService.GetLogicalProductionDate(DateTime.Now).Date;
 
         public string ControllerMatin { get => _controllerMatin; set { _controllerMatin = value; OnPropertyChanged(); } }
         public string ControllerApresMidi { get => _controllerApresMidi; set { _controllerApresMidi = value; OnPropertyChanged(); } }
@@ -68,25 +76,38 @@ namespace Top5.ViewModels
         public string TeamCommentNuit { get => _teamCommentNuit; set { _teamCommentNuit = value; OnPropertyChanged(); } }
         #endregion
 
-        #region Logique des Shifts
-        public bool IsMatinActive => IsCurrentDay && IsTimeBetween(new TimeSpan(4, 30, 0), new TimeSpan(12, 30, 0));
-        public bool IsApresMidiActive => IsCurrentDay && IsTimeBetween(new TimeSpan(12, 30, 0), new TimeSpan(20, 30, 0));
-        public bool IsNuitActive => IsCurrentDay && (IsTimeBetween(new TimeSpan(20, 30, 0), new TimeSpan(23, 59, 59)) || IsTimeBetween(new TimeSpan(0, 0, 0), new TimeSpan(4, 30, 0)));
+        #region Logique Dynamique des Shifts (Configuration)
 
-        public bool IsMatinEnabled => IsCurrentDay && IsTimeBetween(new TimeSpan(4, 30, 0), new TimeSpan(12, 40, 0));
-        public bool IsApresMidiEnabled => IsCurrentDay && IsTimeBetween(new TimeSpan(12, 30, 0), new TimeSpan(20, 40, 0));
-        public bool IsNuitEnabled => IsCurrentDay && (IsTimeBetween(new TimeSpan(20, 30, 0), new TimeSpan(23, 59, 59)) || IsTimeBetween(new TimeSpan(0, 0, 0), new TimeSpan(4, 40, 0)));
+        private TimeSpan GetShiftStart(string shiftName)
+        {
+            var config = ConfigurationService.Load();
+            if (shiftName == "Matin" && TimeSpan.TryParse(config.ShiftMatinStart, out var tm)) return tm;
+            if (shiftName == "ApresMidi" && TimeSpan.TryParse(config.ShiftApresMidiStart, out var ta)) return ta;
+            if (shiftName == "Nuit" && TimeSpan.TryParse(config.ShiftNuitStart, out var tn)) return tn;
 
-        public bool IsMatinTimeWindow => IsMatinEnabled;
-        public bool IsApresMidiTimeWindow => IsApresMidiEnabled;
-        public bool IsNuitTimeWindow => IsNuitEnabled;
+            return shiftName switch { "Matin" => new TimeSpan(4, 30, 0), "ApresMidi" => new TimeSpan(12, 30, 0), _ => new TimeSpan(20, 30, 0) };
+        }
 
         private bool IsTimeBetween(TimeSpan start, TimeSpan end)
         {
             TimeSpan now = DateTime.Now.TimeOfDay;
-            if (start <= end) return now >= start && now <= end;
-            return now >= start || now <= end;
+            if (start <= end) return now >= start && now < end;
+            return now >= start || now < end;
         }
+
+        private TimeSpan NormalizeTime(TimeSpan time) => new TimeSpan(time.Hours, time.Minutes, time.Seconds);
+
+        public bool IsMatinActive => IsCurrentDay && IsTimeBetween(GetShiftStart("Matin"), GetShiftStart("ApresMidi"));
+        public bool IsApresMidiActive => IsCurrentDay && IsTimeBetween(GetShiftStart("ApresMidi"), GetShiftStart("Nuit"));
+        public bool IsNuitActive => IsCurrentDay && IsTimeBetween(GetShiftStart("Nuit"), GetShiftStart("Matin"));
+
+        public bool IsMatinEnabled => IsCurrentDay && IsTimeBetween(GetShiftStart("Matin"), NormalizeTime(GetShiftStart("ApresMidi").Add(TimeSpan.FromMinutes(10))));
+        public bool IsApresMidiEnabled => IsCurrentDay && IsTimeBetween(GetShiftStart("ApresMidi"), NormalizeTime(GetShiftStart("Nuit").Add(TimeSpan.FromMinutes(10))));
+        public bool IsNuitEnabled => IsCurrentDay && IsTimeBetween(GetShiftStart("Nuit"), NormalizeTime(GetShiftStart("Matin").Add(TimeSpan.FromMinutes(10))));
+
+        public bool IsMatinTimeWindow => IsMatinEnabled;
+        public bool IsApresMidiTimeWindow => IsApresMidiEnabled;
+        public bool IsNuitTimeWindow => IsNuitEnabled;
 
         private ShiftReport GetActiveShift(ProductionRow row)
         {
@@ -95,16 +116,24 @@ namespace Top5.ViewModels
             if (IsNuitActive) return row.ReportNuit;
             return row.ReportMatin;
         }
+
+        private string GetActiveShiftName()
+        {
+            if (IsMatinActive) return "Matin";
+            if (IsApresMidiActive) return "ApresMidi";
+            if (IsNuitActive) return "Nuit";
+            return "";
+        }
         #endregion
 
         #region Commands
         public ICommand PreviousDayCommand => new RelayCommand(_ => ViewingDate = ViewingDate.AddDays(-1));
 
         public ICommand NextDayCommand => new RelayCommand(_ => {
-            if (ViewingDate.Date < DateTime.Today) ViewingDate = ViewingDate.AddDays(1);
+            if (ViewingDate.Date < Top5HistoryService.GetLogicalProductionDate(DateTime.Now)) ViewingDate = ViewingDate.AddDays(1);
         });
 
-        public ICommand GoToTodayCommand => new RelayCommand(_ => ViewingDate = DateTime.Today);
+        public ICommand GoToTodayCommand => new RelayCommand(_ => ViewingDate = Top5HistoryService.GetLogicalProductionDate(DateTime.Now));
 
         public ICommand PrintReportCommand => new RelayCommand(_ =>
         {
@@ -150,13 +179,19 @@ namespace Top5.ViewModels
             var vm = new DailyProductionViewModel(ProductionRows);
             var win = new Top5.Views.DailyProductionWindow { DataContext = vm, Owner = Application.Current.MainWindow };
             win.ShowDialog();
-            ForceSave(); LoadDateData();
+
+            RefreshUIBindings();
+            ForceSave();
+            LoadDateData();
         });
 
         public ICommand OpenConfigurationCommand => new RelayCommand(_ => {
             var vm = new ConfigurationViewModel();
             var win = new Top5.Views.ConfigurationWindow { DataContext = vm, Owner = Application.Current.MainWindow };
             win.ShowDialog();
+
+            RefreshUIBindings();
+            LoadDateData();
         });
 
         public ICommand OpenDefectTypesCommand => new RelayCommand(_ => {
@@ -186,18 +221,49 @@ namespace Top5.ViewModels
         // --- CONSTRUCTEUR STANDARD (UI) ---
         public MainViewModel()
         {
+            _viewingDate = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
             LoadDateData();
 
-            // CORRECTION ARCHITECTURE : Tâche asynchrone sécurisée
+            _currentActiveShiftName = GetActiveShiftName();
+
+            _shiftCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            _shiftCheckTimer.Tick += CheckShiftChange;
+            _shiftCheckTimer.Start();
+
+            _autoSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
+            _autoSaveTimer.Tick += (s, e) =>
+            {
+                if (IsCurrentDay) ForceSave();
+            };
+            _autoSaveTimer.Start();
+
             _ = RunStartupTasksAsync();
+        }
+
+        private void CheckShiftChange(object? sender, EventArgs e)
+        {
+            if (!IsCurrentDay) return;
+
+            string newShift = GetActiveShiftName();
+            if (newShift != _currentActiveShiftName && !string.IsNullOrEmpty(newShift))
+            {
+                _currentActiveShiftName = newShift;
+                RefreshUIBindings();
+                TransferUnresolvedDefects();
+                ForceSave();
+            }
+        }
+
+        private void RefreshUIBindings()
+        {
+            OnPropertyChanged(nameof(IsMatinActive)); OnPropertyChanged(nameof(IsApresMidiActive)); OnPropertyChanged(nameof(IsNuitActive));
+            OnPropertyChanged(nameof(IsMatinEnabled)); OnPropertyChanged(nameof(IsApresMidiEnabled)); OnPropertyChanged(nameof(IsNuitEnabled));
+            OnPropertyChanged(nameof(IsMatinTimeWindow)); OnPropertyChanged(nameof(IsApresMidiTimeWindow)); OnPropertyChanged(nameof(IsNuitTimeWindow));
         }
 
         private async Task RunStartupTasksAsync()
         {
-            // On laisse 2 pleines secondes à WPF pour afficher son interface à l'utilisateur
             await Task.Delay(2000);
-
-            // On lance la vérification intelligente des PDF manquants (au ralenti, sans freeze)
             Top5HistoryService.ExportMissingPdfsAsync(DateTime.Today, startAtPastDay: false);
         }
 
@@ -222,28 +288,24 @@ namespace Top5.ViewModels
 
             bool fileLoaded = Top5HistoryService.LoadDailyReport(this, _viewingDate);
 
-            if (!fileLoaded)
+            var latestStates = ProductionHistoryService.GetLatestProductions();
+            foreach (var row in ProductionRows)
             {
-                ControllerMatin = ""; ControllerApresMidi = ""; ControllerNuit = "";
-                TeamCommentMatin = ""; TeamCommentApresMidi = ""; TeamCommentNuit = "";
-
-                var latestStates = ProductionHistoryService.GetLatestProductions();
-                foreach (var row in ProductionRows)
+                if (!fileLoaded && latestStates.ContainsKey(row.Production.Machine))
                 {
-                    if (latestStates.ContainsKey(row.Production.Machine))
-                    {
-                        row.Production.Piece = latestStates[row.Production.Machine].Piece;
-                        row.Production.Moule = latestStates[row.Production.Machine].Moule;
-                        row.Production.RefreshDMS();
+                    row.Production.Piece = latestStates[row.Production.Machine].Piece;
+                    row.Production.Moule = latestStates[row.Production.Machine].Moule;
 
-                        var unresolvedDefects = DefectHistoryService.GetUnresolvedDefects(row.Production.Piece, row.Production.Moule);
-                        if (unresolvedDefects.Count > 0)
-                        {
-                            var activeShift = GetActiveShift(row);
-                            foreach (var defect in unresolvedDefects) activeShift.Defects.Add(defect);
-                        }
-                    }
+                    // NOUVEAU : Récupération intelligente de la priorité d'hier !
+                    row.Production.Priority = Top5HistoryService.GetLastKnownPriority(row.Production.Machine, _viewingDate);
+
+                    row.Production.RefreshDMS();
                 }
+            }
+
+            if (IsCurrentDay)
+            {
+                TransferUnresolvedDefects();
             }
 
             foreach (var row in ProductionRows)
@@ -254,9 +316,35 @@ namespace Top5.ViewModels
             }
         }
 
+        private void TransferUnresolvedDefects()
+        {
+            foreach (var row in ProductionRows)
+            {
+                var unresolvedDefects = DefectHistoryService.GetUnresolvedDefects(row.Production.Piece, row.Production.Moule);
+                if (unresolvedDefects.Count > 0)
+                {
+                    var activeShift = GetActiveShift(row);
+                    foreach (var defect in unresolvedDefects)
+                    {
+                        if (!activeShift.Defects.Any(d => d.Id == defect.Id))
+                        {
+                            activeShift.Defects.Add(new Defect
+                            {
+                                Id = defect.Id,
+                                DefectType = defect.DefectType,
+                                CoreNumber = defect.CoreNumber,
+                                Comment = defect.Comment,
+                                State = defect.State
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         public void ForceSave()
         {
-            if (_viewingDate.Date == DateTime.Today)
+            if (_viewingDate.Date == Top5HistoryService.GetLogicalProductionDate(DateTime.Now).Date)
             {
                 Top5HistoryService.SaveDailyReport(this, _viewingDate);
             }
