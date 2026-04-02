@@ -27,6 +27,9 @@ namespace Top5.ViewModels
         private DispatcherTimer _autoSaveTimer;
         private string _currentActiveShiftName = "";
 
+        // Mémoire du jour logique pour ne pas perturber la navigation dans les archives
+        private DateTime _lastKnownLogicalToday;
+
         public ObservableCollection<ProductionRow> ProductionRows { get; set; } = new ObservableCollection<ProductionRow>();
 
         #region Propriétés
@@ -45,6 +48,10 @@ namespace Top5.ViewModels
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsCurrentDay));
                     OnPropertyChanged(nameof(ViewingDayOfYear));
+
+                    // CORRECTION : On force l'interface à recalculer les droits (verrouille les TextBox en mode archive)
+                    RefreshUIBindings();
+
                     LoadDateData();
                 }
             }
@@ -221,7 +228,8 @@ namespace Top5.ViewModels
         // --- CONSTRUCTEUR STANDARD (UI) ---
         public MainViewModel()
         {
-            _viewingDate = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
+            _lastKnownLogicalToday = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
+            _viewingDate = _lastKnownLogicalToday;
             LoadDateData();
 
             _currentActiveShiftName = GetActiveShiftName();
@@ -233,23 +241,44 @@ namespace Top5.ViewModels
             _autoSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
             _autoSaveTimer.Tick += (s, e) =>
             {
-                if (IsCurrentDay) ForceSave();
+                ForceSave();
             };
             _autoSaveTimer.Start();
 
             _ = RunStartupTasksAsync();
         }
 
+        // ==============================================================================
+        // MOTEUR DE CHANGEMENT D'ÉQUIPE ET DE JOUR AUTOMATIQUE (SÉCURISÉ)
+        // ==============================================================================
         private void CheckShiftChange(object? sender, EventArgs e)
         {
+            var currentLogicalToday = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
+
+            if (currentLogicalToday > _lastKnownLogicalToday)
+            {
+                if (_viewingDate.Date == _lastKnownLogicalToday.Date)
+                {
+                    Top5HistoryService.SaveDailyReport(this, _viewingDate);
+                    ViewingDate = currentLogicalToday;
+                }
+
+                _lastKnownLogicalToday = currentLogicalToday;
+                _currentActiveShiftName = GetActiveShiftName();
+                return;
+            }
+
             if (!IsCurrentDay) return;
 
             string newShift = GetActiveShiftName();
             if (newShift != _currentActiveShiftName && !string.IsNullOrEmpty(newShift))
             {
+                ForceSave();
+
                 _currentActiveShiftName = newShift;
                 RefreshUIBindings();
                 TransferUnresolvedDefects();
+
                 ForceSave();
             }
         }
@@ -295,10 +324,7 @@ namespace Top5.ViewModels
                 {
                     row.Production.Piece = latestStates[row.Production.Machine].Piece;
                     row.Production.Moule = latestStates[row.Production.Machine].Moule;
-
-                    // NOUVEAU : Récupération intelligente de la priorité d'hier !
                     row.Production.Priority = Top5HistoryService.GetLastKnownPriority(row.Production.Machine, _viewingDate);
-
                     row.Production.RefreshDMS();
                 }
             }
@@ -344,7 +370,7 @@ namespace Top5.ViewModels
 
         public void ForceSave()
         {
-            if (_viewingDate.Date == Top5HistoryService.GetLogicalProductionDate(DateTime.Now).Date)
+            if (IsCurrentDay)
             {
                 Top5HistoryService.SaveDailyReport(this, _viewingDate);
             }
