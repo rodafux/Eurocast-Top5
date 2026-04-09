@@ -49,9 +49,7 @@ namespace Top5.ViewModels
                     OnPropertyChanged(nameof(IsCurrentDay));
                     OnPropertyChanged(nameof(ViewingDayOfYear));
 
-                    // CORRECTION : On force l'interface à recalculer les droits (verrouille les TextBox en mode archive)
                     RefreshUIBindings();
-
                     LoadDateData();
                 }
             }
@@ -104,17 +102,31 @@ namespace Top5.ViewModels
 
         private TimeSpan NormalizeTime(TimeSpan time) => new TimeSpan(time.Hours, time.Minutes, time.Seconds);
 
+        // NOUVEAU : Règle spéciale qui détecte si on est dans les 10 min de battement du matin (04:30 - 04:40)
+        public bool IsMorningGracePeriod => IsTimeBetween(GetShiftStart("Matin"), NormalizeTime(GetShiftStart("Matin").Add(TimeSpan.FromMinutes(10))));
+
+        // NOUVEAU : Vérifie si la feuille consultée est celle d'hier
+        public bool IsPreviousDay => ViewingDate.Date == Top5HistoryService.GetLogicalProductionDate(DateTime.Now).AddDays(-1).Date;
+
+        // 1. Équipe réellement en cours (Détermine le fond bleu sur la feuille du jour)
         public bool IsMatinActive => IsCurrentDay && IsTimeBetween(GetShiftStart("Matin"), GetShiftStart("ApresMidi"));
         public bool IsApresMidiActive => IsCurrentDay && IsTimeBetween(GetShiftStart("ApresMidi"), GetShiftStart("Nuit"));
         public bool IsNuitActive => IsCurrentDay && IsTimeBetween(GetShiftStart("Nuit"), GetShiftStart("Matin"));
 
+        // 2. Déverrouillage des cases de données (Avec les 10 minutes de battement)
         public bool IsMatinEnabled => IsCurrentDay && IsTimeBetween(GetShiftStart("Matin"), NormalizeTime(GetShiftStart("ApresMidi").Add(TimeSpan.FromMinutes(10))));
         public bool IsApresMidiEnabled => IsCurrentDay && IsTimeBetween(GetShiftStart("ApresMidi"), NormalizeTime(GetShiftStart("Nuit").Add(TimeSpan.FromMinutes(10))));
-        public bool IsNuitEnabled => IsCurrentDay && IsTimeBetween(GetShiftStart("Nuit"), NormalizeTime(GetShiftStart("Matin").Add(TimeSpan.FromMinutes(10))));
 
-        public bool IsMatinTimeWindow => IsMatinEnabled;
-        public bool IsApresMidiTimeWindow => IsApresMidiEnabled;
-        public bool IsNuitTimeWindow => IsNuitEnabled;
+        // CORRECTION MAJEURE : La Nuit est modifiable sur le jour actuel (jusqu'à 04h30) OU sur la feuille de la veille (pendant le battement de 04h30 à 04h40)
+        public bool IsNuitEnabled => (IsCurrentDay && IsTimeBetween(GetShiftStart("Nuit"), GetShiftStart("Matin"))) ||
+                                     (IsPreviousDay && IsMorningGracePeriod);
+
+        // 3. Verrouillage des noms de contrôleurs à L'HEURE PILE (pas de battement)
+        public bool IsMatinTimeWindow => IsMatinActive;
+        public bool IsApresMidiTimeWindow => IsApresMidiActive;
+
+        // Le nom du contrôleur de nuit reste modifiable sur la veille pendant le battement, pour corriger une erreur de dernière minute
+        public bool IsNuitTimeWindow => IsNuitActive || (IsPreviousDay && IsMorningGracePeriod);
 
         private ShiftReport GetActiveShift(ProductionRow row)
         {
@@ -164,10 +176,11 @@ namespace Top5.ViewModels
             string shift = param?.ToString() ?? "";
             string current = shift switch { "Matin" => TeamCommentMatin, "ApresMidi" => TeamCommentApresMidi, "Nuit" => TeamCommentNuit, _ => "" };
 
+            // La consigne profite du battement de 10 min
             bool isReadOnly = true;
-            if (shift == "Matin") isReadOnly = !IsMatinTimeWindow;
-            else if (shift == "ApresMidi") isReadOnly = !IsApresMidiTimeWindow;
-            else if (shift == "Nuit") isReadOnly = !IsNuitTimeWindow;
+            if (shift == "Matin") isReadOnly = !IsMatinEnabled;
+            else if (shift == "ApresMidi") isReadOnly = !IsApresMidiEnabled;
+            else if (shift == "Nuit") isReadOnly = !IsNuitEnabled;
 
             var vm = new TeamCommentViewModel(shift, current, isReadOnly);
             var win = new Top5.Views.TeamCommentWindow { DataContext = vm, Owner = Application.Current.MainWindow };
@@ -181,6 +194,8 @@ namespace Top5.ViewModels
                 ForceSave();
             }
         });
+
+        // --- COMMANDES DU MENU ---
 
         public ICommand OpenDailyProductionCommand => new RelayCommand(_ => {
             var vm = new DailyProductionViewModel(ProductionRows);
@@ -228,23 +243,28 @@ namespace Top5.ViewModels
         // --- CONSTRUCTEUR STANDARD (UI) ---
         public MainViewModel()
         {
-            _lastKnownLogicalToday = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
-            _viewingDate = _lastKnownLogicalToday;
-            LoadDateData();
-
-            _currentActiveShiftName = GetActiveShiftName();
-
+            // 1. INITIALISATION IMMÉDIATE (Corrige les avertissements de nullabilité)
             _shiftCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
             _shiftCheckTimer.Tick += CheckShiftChange;
-            _shiftCheckTimer.Start();
 
             _autoSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
             _autoSaveTimer.Tick += (s, e) =>
             {
                 ForceSave();
             };
+
+            // 2. CHARGEMENT DES DONNÉES
+            _lastKnownLogicalToday = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
+            _viewingDate = _lastKnownLogicalToday;
+            LoadDateData();
+
+            _currentActiveShiftName = GetActiveShiftName();
+
+            // 3. DÉMARRAGE DES TIMERS
+            _shiftCheckTimer.Start();
             _autoSaveTimer.Start();
 
+            // 4. TÂCHES DE FOND (PDF)
             _ = RunStartupTasksAsync();
         }
 
@@ -253,6 +273,10 @@ namespace Top5.ViewModels
         // ==============================================================================
         private void CheckShiftChange(object? sender, EventArgs e)
         {
+            // CORRECTION : Forcer l'interface à se mettre à jour toutes les 30 secondes
+            // Cela permet de détecter et verrouiller instantanément la fin des 10 min de battement !
+            RefreshUIBindings();
+
             var currentLogicalToday = Top5HistoryService.GetLogicalProductionDate(DateTime.Now);
 
             if (currentLogicalToday > _lastKnownLogicalToday)
@@ -276,7 +300,6 @@ namespace Top5.ViewModels
                 ForceSave();
 
                 _currentActiveShiftName = newShift;
-                RefreshUIBindings();
                 TransferUnresolvedDefects();
 
                 ForceSave();
@@ -299,6 +322,10 @@ namespace Top5.ViewModels
         // --- CONSTRUCTEUR SILENCIEUX (BACKGROUND PDF) ---
         public MainViewModel(DateTime backgroundDate)
         {
+            // Initialisation d'urgence pour calmer le compilateur
+            _shiftCheckTimer = new DispatcherTimer();
+            _autoSaveTimer = new DispatcherTimer();
+
             _viewingDate = backgroundDate;
             LoadDateData();
         }
@@ -316,6 +343,18 @@ namespace Top5.ViewModels
             }
 
             bool fileLoaded = Top5HistoryService.LoadDailyReport(this, _viewingDate);
+
+            // CORRECTION : Si la journée est Vierge (Nouveau jour sans sauvegarde),
+            // on force l'effacement des variables de la veille restées en mémoire !
+            if (!fileLoaded)
+            {
+                ControllerMatin = "";
+                ControllerApresMidi = "";
+                ControllerNuit = "";
+                TeamCommentMatin = "";
+                TeamCommentApresMidi = "";
+                TeamCommentNuit = "";
+            }
 
             var latestStates = ProductionHistoryService.GetLatestProductions();
             foreach (var row in ProductionRows)

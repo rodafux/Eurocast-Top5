@@ -39,7 +39,6 @@ namespace Top5.Services
                 var history = JsonSerializer.Deserialize<List<DefectHistoryEntry>>(File.ReadAllText(filePath)) ?? new List<DefectHistoryEntry>();
 
                 // --- PATCH RÉTROACTIF POUR LES ANCIENS DÉFAUTS ---
-                // Le programme devine la Machine et la Date du DMS pour les vieux fichiers JSON
                 string assumedMachine = "Inconnue";
                 string assumedDmsDate = "Inconnue";
 
@@ -57,14 +56,36 @@ namespace Top5.Services
 
                 foreach (var entry in history)
                 {
-                    if (entry.Machine == "Inconnue") entry.Machine = assumedMachine;
-                    if (entry.DateDms == "Inconnue") entry.DateDms = assumedDmsDate;
+                    if (string.IsNullOrEmpty(entry.Machine) || entry.Machine == "Inconnue") entry.Machine = assumedMachine;
+                    if (string.IsNullOrEmpty(entry.DateDms) || entry.DateDms == "Inconnue") entry.DateDms = assumedDmsDate;
                 }
                 // -------------------------------------------------
 
                 return history;
             }
-            catch (Exception ex) { Logger.Log($"Erreur LoadHistory : {ex.Message}"); return new List<DefectHistoryEntry>(); }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erreur LoadHistory : {ex.Message}");
+                return new List<DefectHistoryEntry>();
+            }
+        }
+
+        // Récupère l'historique complet d'un défaut spécifique pour l'afficher dans la fenêtre
+        public static List<DefectHistoryEntry> GetHistory(string piece, string moule, Guid defectId)
+        {
+            try
+            {
+                var history = LoadHistory(piece, moule);
+                return history.Where(e => e.Id == defectId)
+                              .OrderByDescending(e => e.Date)
+                              .ThenByDescending(e => e.Heure)
+                              .ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Erreur GetHistory : {ex.Message}");
+                return new List<DefectHistoryEntry>();
+            }
         }
 
         public static void LogDefectAction(ProductionContext context, string controllerName, Defect defect, string action)
@@ -73,7 +94,9 @@ namespace Top5.Services
             try
             {
                 string filePath = Path.Combine(GetDirectoryPath(), GetSafeFileName(context.Piece, context.Moule));
-                List<DefectHistoryEntry> history = File.Exists(filePath) ? JsonSerializer.Deserialize<List<DefectHistoryEntry>>(File.ReadAllText(filePath)) ?? new List<DefectHistoryEntry>() : new List<DefectHistoryEntry>();
+
+                // On utilise LoadHistory au lieu de lire brutalement le fichier pour bénéficier du Patch Rétroactif
+                List<DefectHistoryEntry> history = LoadHistory(context.Piece, context.Moule);
 
                 history.Add(new DefectHistoryEntry
                 {
@@ -85,12 +108,11 @@ namespace Top5.Services
                     Gravite = defect.State.ToString(),
                     Commentaire = defect.Comment,
                     NumeroNoyau = defect.CoreNumber,
-                    Action = action,
+                    Action = action, // "Création" ou "Modification"
                     IdDms = DMSService.GetLatestDMSId(context.Machine, context.Piece, context.Moule),
-
-                    // NOUVEAU : Enregistrement définitif pour les futures actions
                     Machine = context.Machine,
-                    DateDms = DMSService.GetLastDMSDateString(context.Machine, context.Piece, context.Moule)
+                    DateDms = DMSService.GetLastDMSDateString(context.Machine, context.Piece, context.Moule),
+                    DateInitiale = DateTime.Now.ToString("dd/MM/yyyy")
                 });
 
                 File.WriteAllText(filePath, JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true }));
@@ -103,11 +125,8 @@ namespace Top5.Services
             var unresolved = new List<Defect>();
             try
             {
-                string filePath = Path.Combine(GetDirectoryPath(), GetSafeFileName(piece, moule));
-                if (!File.Exists(filePath)) return unresolved;
-
-                var history = JsonSerializer.Deserialize<List<DefectHistoryEntry>>(File.ReadAllText(filePath));
-                if (history == null) return unresolved;
+                var history = LoadHistory(piece, moule);
+                if (history.Count == 0) return unresolved;
 
                 foreach (var group in history.GroupBy(x => x.Id))
                 {
@@ -141,7 +160,7 @@ namespace Top5.Services
                 int days = config.NoyauAlertDays <= 0 ? 7 : config.NoyauAlertDays;
                 DateTime thresholdDate = DateTime.Now.Date.AddDays(-days);
 
-                var history = LoadHistory(piece, moule); // Utilise LoadHistory avec le patch rétroactif
+                var history = LoadHistory(piece, moule);
                 string targetCore = coreNumber.Trim();
                 var groupedHistory = history.GroupBy(h => h.Id);
 

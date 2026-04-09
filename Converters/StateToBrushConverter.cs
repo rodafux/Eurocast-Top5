@@ -4,7 +4,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using Top5.Models;
 
-namespace Top5.Converters
+namespace Top5.Converters // <-- CETTE LIGNE EST CRUCIALE
 {
     public class StateToBrushConverter : IValueConverter
     {
@@ -14,14 +14,13 @@ namespace Top5.Converters
             {
                 return state switch
                 {
-                    ControlState.B => Brushes.LightGreen,
-                    ControlState.AA => Brushes.Orange,
-                    ControlState.NC => Brushes.Tomato,
-                    // Gris très clair qui indique que c'est un bouton cliquable, mais inactif
-                    _ => new SolidColorBrush(Color.FromRgb(225, 225, 225))
+                    ControlState.B => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")),
+                    ControlState.AA => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")),
+                    ControlState.NC => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")),
+                    _ => new SolidColorBrush(Colors.Gray)
                 };
             }
-            return Brushes.Transparent;
+            return new SolidColorBrush(Colors.Gray);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

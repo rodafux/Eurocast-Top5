@@ -75,7 +75,7 @@
 
                 <TextBlock Text="Défauts:" VerticalAlignment="Center" FontSize="11" Margin="0,0,4,0" Foreground="#555555"/>
 
-                <Button Content="+" Click="BtnAddDefect_Click" Width="20" Height="20" FontWeight="Bold" Background="#EFEFEF"/>
+                <Button Content="+" Command="{Binding AddDefectCommand}" Width="20" Height="20" FontWeight="Bold" Background="#EFEFEF"/>
 
                 <TextBlock Text="Avis NC:" ToolTip="Nombre d'Avis de Non Conformité" VerticalAlignment="Center" FontSize="11" Margin="15,0,4,0" Foreground="#555555"/>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -110,6 +110,19 @@
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Fill="{Binding State, Converter={StaticResource StateToBrushConverter}}" Width="10" Height="10" Margin="0,0,4,0" Stroke="Black" StrokeThickness="0.5" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding DefectType}" FontSize="11" VerticalAlignment="Center" FontWeight="SemiBold"/>
+
+                                    <TextBlock Text="*" Foreground="#E67E22" FontSize="14" FontWeight="Bold" Margin="2,-4,0,0" ToolTip="Défaut modifié">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsModified}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
 
                                     <TextBlock Text="{Binding CoreNumber, StringFormat=' [Noyau n°{0}]'}" FontSize="11" FontWeight="Bold" Foreground="#C0392B" VerticalAlignment="Center" Margin="3,0,0,0">
                                         <TextBlock.Style>

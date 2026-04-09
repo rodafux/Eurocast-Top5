@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using System.Windows;
 
-namespace Top5.Converters
+namespace Top5.Converters // <-- CETTE LIGNE EST CRUCIALE
 {
     public class EnumToBooleanConverter : IValueConverter
     {
@@ -16,17 +16,10 @@ namespace Top5.Converters
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value == null || parameter == null) return Binding.DoNothing;
-
-            if (value is bool b && b)
+            if (value is bool isChecked && isChecked)
             {
-                try
-                {
-                    return Enum.Parse(targetType, parameter.ToString()!, true);
-                }
-                catch
-                {
-                    return Binding.DoNothing;
-                }
+                try { return Enum.Parse(targetType, parameter.ToString()!, true); }
+                catch { return Binding.DoNothing; }
             }
             return Binding.DoNothing;
         }

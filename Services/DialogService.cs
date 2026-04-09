@@ -10,9 +10,9 @@ namespace Top5.Services
 
         private DialogService() { }
 
-        public (bool Validated, bool Deleted, Defect? Data) ShowDefectDialog(Defect? existingDefect = null)
+        public (bool Validated, bool Deleted, Defect? Data) ShowDefectDialog(Defect? existingDefect = null, ProductionContext? context = null, string controller = "Inconnu")
         {
-            var viewModel = new DefectDialogViewModel(existingDefect);
+            var viewModel = new DefectDialogViewModel(existingDefect, context, controller);
             var window = new DefectDialogWindow
             {
                 DataContext = viewModel
@@ -30,7 +30,7 @@ namespace Top5.Services
                     DefectType = viewModel.SelectedDefectType,
                     State = viewModel.SelectedState,
                     Comment = viewModel.Comment,
-                    CoreNumber = viewModel.CoreNumber // Prise en compte du noyau
+                    CoreNumber = viewModel.CoreNumber
                 });
             }
 

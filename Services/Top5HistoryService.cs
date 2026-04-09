@@ -36,12 +36,10 @@ namespace Top5.Services
             return Path.Combine(historyDir, fileName);
         }
 
-        // NOUVEAU : Fonction qui cherche la priorité de la machine dans les jours précédents
         public static int GetLastKnownPriority(string machine, DateTime currentDate)
         {
             try
             {
-                // On cherche jusqu'à 3 jours en arrière pour récupérer la dernière Prio connue
                 for (int i = 1; i <= 3; i++)
                 {
                     DateTime pastDate = currentDate.AddDays(-i);
@@ -55,7 +53,7 @@ namespace Top5.Services
                 }
             }
             catch { }
-            return 0; // Si introuvable, retombe à 0 (☆)
+            return 0;
         }
 
         public static void SaveDailyReport(MainViewModel vm, DateTime prodDate)
@@ -76,7 +74,7 @@ namespace Top5.Services
                         Machine = row.Production.Machine,
                         Piece = row.Production.Piece,
                         Moule = row.Production.Moule,
-                        Priority = row.Production.Priority, // SAUVEGARDE LA PRIO
+                        Priority = row.Production.Priority,
                         Matin = MapShift(row.ReportMatin),
                         ApresMidi = MapShift(row.ReportApresMidi),
                         Nuit = MapShift(row.ReportNuit)
@@ -121,12 +119,13 @@ namespace Top5.Services
                     {
                         rowVm.Production.Piece = rowDto.Piece;
                         rowVm.Production.Moule = rowDto.Moule;
-                        rowVm.Production.Priority = rowDto.Priority; // RESTAURE LA PRIO DE LA JOURNÉE
+                        rowVm.Production.Priority = rowDto.Priority;
                         rowVm.Production.RefreshDMS();
 
-                        ApplyShift(rowVm.ReportMatin, rowDto.Matin);
-                        ApplyShift(rowVm.ReportApresMidi, rowDto.ApresMidi);
-                        ApplyShift(rowVm.ReportNuit, rowDto.Nuit);
+                        // L'AJOUT EST ICI : On transmet la Pièce et le Moule pour la rétroactivité
+                        ApplyShift(rowVm.ReportMatin, rowDto.Matin, rowDto.Piece, rowDto.Moule);
+                        ApplyShift(rowVm.ReportApresMidi, rowDto.ApresMidi, rowDto.Piece, rowDto.Moule);
+                        ApplyShift(rowVm.ReportNuit, rowDto.Nuit, rowDto.Piece, rowDto.Moule);
                     }
                 }
                 return true;
@@ -199,12 +198,14 @@ namespace Top5.Services
                     DefectType = d.DefectType,
                     State = d.State.ToString(),
                     Comment = d.Comment,
-                    CoreNumber = d.CoreNumber
+                    CoreNumber = d.CoreNumber,
+                    IsModified = d.IsModified // SAUVEGARDE DE L'ÉTOILE
                 }).ToList()
             };
         }
 
-        private static void ApplyShift(ShiftReport shift, ShiftReportDTO dto)
+        // L'AJOUT EST ICI : Les paramètres piece et moule et le scan de l'historique
+        private static void ApplyShift(ShiftReport shift, ShiftReportDTO dto, string piece, string moule)
         {
             if (Enum.TryParse(dto.RXState, out ControlState rx)) shift.RXState = rx;
             if (Enum.TryParse(dto.DimensionalState, out ControlState dim)) shift.DimensionalState = dim;
@@ -214,9 +215,27 @@ namespace Top5.Services
             shift.AncCount = dto.AncCount;
 
             shift.Defects.Clear();
+
+            // On charge l'historique pour vérifier si d'anciens défauts ont été modifiés
+            var fullHistory = DefectHistoryService.LoadHistory(piece, moule);
+
             foreach (var d in dto.Defects)
             {
-                var def = new Defect { Id = d.Id, DefectType = d.DefectType, Comment = d.Comment, CoreNumber = d.CoreNumber };
+                var def = new Defect
+                {
+                    Id = d.Id,
+                    DefectType = d.DefectType,
+                    Comment = d.Comment,
+                    CoreNumber = d.CoreNumber,
+                    IsModified = d.IsModified
+                };
+
+                // DÉTECTION RÉTROACTIVE POUR ALLUMER L'ÉTOILE
+                if (!def.IsModified && fullHistory != null && fullHistory.Any(h => h.Id == d.Id && h.Action == "Modification"))
+                {
+                    def.IsModified = true;
+                }
+
                 if (Enum.TryParse(d.State, out ControlState st)) def.State = st;
                 shift.Defects.Add(def);
             }

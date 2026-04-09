@@ -1,85 +1,75 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Input;
 using Top5.Models;
 using Top5.Services;
+using Top5.Utils;
 
 namespace Top5.ViewModels
 {
     public class DefectDialogViewModel : ViewModelBase
     {
-        public ObservableCollection<string> AvailableDefects { get; set; }
+        private Defect? _defect;
+        private ProductionContext? _context;
+        private string _controller = "Inconnu";
 
         public bool IsEditMode { get; set; }
+        public bool IsCreationMode => !IsEditMode;
+        public bool IsSaved { get; private set; }
+
+        private bool _isReadOnly;
+        public bool IsReadOnly { get => _isReadOnly; set { _isReadOnly = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsEditable)); } }
+        public bool IsEditable => !IsReadOnly;
+
+        public ObservableCollection<string> AvailableDefects { get; set; } = new ObservableCollection<string>(DefectTypeDataService.Load());
+        public ObservableCollection<DefectHistoryEntry> History { get; set; } = new ObservableCollection<DefectHistoryEntry>();
 
         private string _selectedDefectType = string.Empty;
-        public string SelectedDefectType
+        public string SelectedDefectType { get => _selectedDefectType; set { _selectedDefectType = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsCoreNumberRequired)); } }
+
+        public bool IsCoreNumberRequired => SelectedDefectType == "Noyau cassé" || SelectedDefectType == "Noyau plié" || SelectedDefectType == "Noyau HS" || SelectedDefectType == "Casse goupille";
+
+        public ControlState SelectedState { get; set; }
+        public string Comment { get; set; } = string.Empty;
+        public string CoreNumber { get; set; } = string.Empty;
+
+        public ICommand SaveCommand { get; }
+        public Action? CloseAction { get; set; }
+
+        public DefectDialogViewModel(Defect? existingDefect = null, ProductionContext? context = null, string controller = "Inconnu")
         {
-            get => _selectedDefectType;
-            set
-            {
-                _selectedDefectType = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IsCoreNumberRequired)); // Notifie la vue que l'état a changé
-            }
-        }
-
-        // Règle métier stricte demandée
-        public bool IsCoreNumberRequired =>
-            SelectedDefectType == "Noyau cassé" ||
-            SelectedDefectType == "Noyau plié" ||
-            SelectedDefectType == "Noyau HS";
-
-        private string _coreNumber = string.Empty;
-        public string CoreNumber
-        {
-            get => _coreNumber;
-            set { _coreNumber = value; OnPropertyChanged(); }
-        }
-
-        private ControlState _selectedState = ControlState.NC;
-        public ControlState SelectedState
-        {
-            get => _selectedState;
-            set { _selectedState = value; OnPropertyChanged(); }
-        }
-
-        private string _comment = string.Empty;
-        public string Comment
-        {
-            get => _comment;
-            set { _comment = value; OnPropertyChanged(); }
-        }
-
-        public ICommand SetStateCommand { get; }
-
-        public DefectDialogViewModel(Defect? existingDefect = null)
-        {
-            // Chargement de la liste dynamique
-            AvailableDefects = new ObservableCollection<string>(DefectTypeDataService.Load());
-
-            SetStateCommand = new RelayCommand(ExecuteSetState);
+            SaveCommand = new RelayCommand(_ => { IsSaved = true; CloseAction?.Invoke(); });
 
             if (existingDefect != null)
             {
                 IsEditMode = true;
+                _defect = existingDefect;
+                _context = context;
+                _controller = controller;
                 SelectedDefectType = existingDefect.DefectType;
                 SelectedState = existingDefect.State;
                 Comment = existingDefect.Comment;
                 CoreNumber = existingDefect.CoreNumber;
-            }
-            else
-            {
-                IsEditMode = false;
-                if (AvailableDefects.Count > 0)
-                    SelectedDefectType = AvailableDefects[0];
+
+                if (context != null)
+                {
+                    var list = DefectHistoryService.GetHistory(context.Piece, context.Moule, existingDefect.Id);
+                    foreach (var h in list) History.Add(h);
+                }
             }
         }
 
-        private void ExecuteSetState(object? parameter)
+        public void FinalizeUpdate()
         {
-            if (parameter is string stateStr && System.Enum.TryParse(stateStr, out ControlState parsedState))
+            if (_defect != null && _context != null && !IsReadOnly)
             {
-                SelectedState = parsedState;
+                _defect.DefectType = SelectedDefectType;
+                _defect.State = SelectedState;
+                _defect.Comment = Comment;
+                _defect.CoreNumber = CoreNumber;
+                _defect.IsModified = true; // Allume l'étoile
+                DefectHistoryService.LogDefectAction(_context, _controller, _defect, "Modification");
             }
         }
     }

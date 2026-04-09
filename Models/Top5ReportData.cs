@@ -22,8 +22,6 @@ namespace Top5.Models
         public string Machine { get; set; } = string.Empty;
         public string Piece { get; set; } = string.Empty;
         public string Moule { get; set; } = string.Empty;
-
-        // NOUVEAU : Sauvegarde de la priorité
         public int Priority { get; set; } = 0;
 
         public ShiftReportDTO Matin { get; set; } = new ShiftReportDTO();
@@ -48,5 +46,6 @@ namespace Top5.Models
         public string State { get; set; } = "NonRenseigne";
         public string Comment { get; set; } = string.Empty;
         public string CoreNumber { get; set; } = string.Empty;
+        public bool IsModified { get; set; } // Sauvegarde de l'étoile
     }
 }

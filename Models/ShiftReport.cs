@@ -93,7 +93,7 @@ namespace Top5.Models
 
         private void ExecuteAddDefect(object? obj)
         {
-            // VÉRIFICATION MÉTIER : On bloque si la machine n'a pas de production en cours
+            // VÉRIFICATION MÉTIER
             if (Production.Piece == "---" || Production.Moule == "---")
             {
                 MessageBox.Show("Impossible d'ajouter un défaut : Aucune pièce ou moule n'est affecté à cette machine actuellement.\nVeuillez d'abord configurer la production en cours.",
@@ -101,14 +101,15 @@ namespace Top5.Models
                 return;
             }
 
-            var result = DialogService.Instance.ShowDefectDialog();
+            string controller = GetControllerName?.Invoke() ?? "Inconnu";
+
+            // ON PASSE LE CONTEXTE DE CREATION
+            var result = DialogService.Instance.ShowDefectDialog(null, Production, controller);
 
             if (result.Validated && result.Data != null)
             {
                 Defects.Add(result.Data);
-
-                string controller = GetControllerName?.Invoke() ?? "Inconnu";
-                DefectHistoryService.LogDefectAction(Production, controller, result.Data, "Ajout");
+                DefectHistoryService.LogDefectAction(Production, controller, result.Data, "Création");
             }
         }
 
@@ -116,7 +117,6 @@ namespace Top5.Models
         {
             if (parameter is Defect defectToEdit)
             {
-                // VÉRIFICATION MÉTIER ÉGALEMENT ICI
                 if (Production.Piece == "---" || Production.Moule == "---")
                 {
                     MessageBox.Show("Impossible de modifier un défaut sur une machine sans production affectée.",
@@ -124,12 +124,13 @@ namespace Top5.Models
                     return;
                 }
 
-                var result = DialogService.Instance.ShowDefectDialog(defectToEdit);
+                string controller = GetControllerName?.Invoke() ?? "Inconnu";
+
+                // ON PASSE LE DÉFAUT + LE CONTEXTE DE MODIFICATION
+                var result = DialogService.Instance.ShowDefectDialog(defectToEdit, Production, controller);
 
                 if (result.Validated)
                 {
-                    string controller = GetControllerName?.Invoke() ?? "Inconnu";
-
                     if (result.Deleted)
                     {
                         Defects.Remove(defectToEdit);
@@ -141,6 +142,9 @@ namespace Top5.Models
                         defectToEdit.State = result.Data.State;
                         defectToEdit.Comment = result.Data.Comment;
                         defectToEdit.CoreNumber = result.Data.CoreNumber;
+
+                        // ON ALLUME L'ÉTOILE DE MODIFICATION ICI !
+                        defectToEdit.IsModified = true;
 
                         DefectHistoryService.LogDefectAction(Production, controller, defectToEdit, "Modification");
                     }
