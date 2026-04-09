@@ -10,6 +10,9 @@ namespace Top5.Services
 {
     public static class DefectHistoryService
     {
+        // VERROU DE SÉCURITÉ : Empêche deux fils d'accéder au même fichier en même temps
+        private static readonly object _fileLock = new object();
+
         private static string GetDirectoryPath()
         {
             var config = ConfigurationService.Load();
@@ -31,93 +34,78 @@ namespace Top5.Services
 
         public static List<DefectHistoryEntry> LoadHistory(string piece, string moule)
         {
-            try
+            // On verrouille l'accès pendant la lecture
+            lock (_fileLock)
             {
                 string filePath = Path.Combine(GetDirectoryPath(), GetSafeFileName(piece, moule));
                 if (!File.Exists(filePath)) return new List<DefectHistoryEntry>();
 
-                var history = JsonSerializer.Deserialize<List<DefectHistoryEntry>>(File.ReadAllText(filePath)) ?? new List<DefectHistoryEntry>();
-
-                // --- PATCH RÉTROACTIF POUR LES ANCIENS DÉFAUTS ---
-                string assumedMachine = "Inconnue";
-                string assumedDmsDate = "Inconnue";
-
-                try
+                for (int i = 0; i < 3; i++) // Tentatives de lecture (Retry)
                 {
-                    var latestProds = ProductionHistoryService.GetLatestProductions();
-                    var match = latestProds.FirstOrDefault(x => x.Value.Piece == piece && x.Value.Moule == moule);
-                    if (match.Key != null)
+                    try
                     {
-                        assumedMachine = match.Key;
-                        assumedDmsDate = DMSService.GetLastDMSDateString(assumedMachine, piece, moule);
+                        string json = File.ReadAllText(filePath);
+                        return JsonSerializer.Deserialize<List<DefectHistoryEntry>>(json) ?? new List<DefectHistoryEntry>();
                     }
+                    catch (IOException) { Thread.Sleep(50); } // Petit délai si occupé
+                    catch (Exception ex) { Logger.Log($"Erreur LoadHistory : {ex.Message}"); break; }
                 }
-                catch { }
-
-                foreach (var entry in history)
-                {
-                    if (string.IsNullOrEmpty(entry.Machine) || entry.Machine == "Inconnue") entry.Machine = assumedMachine;
-                    if (string.IsNullOrEmpty(entry.DateDms) || entry.DateDms == "Inconnue") entry.DateDms = assumedDmsDate;
-                }
-                // -------------------------------------------------
-
-                return history;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erreur LoadHistory : {ex.Message}");
                 return new List<DefectHistoryEntry>();
             }
         }
 
-        // Récupère l'historique complet d'un défaut spécifique pour l'afficher dans la fenêtre
         public static List<DefectHistoryEntry> GetHistory(string piece, string moule, Guid defectId)
         {
-            try
-            {
-                var history = LoadHistory(piece, moule);
-                return history.Where(e => e.Id == defectId)
-                              .OrderByDescending(e => e.Date)
-                              .ThenByDescending(e => e.Heure)
-                              .ToList();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Erreur GetHistory : {ex.Message}");
-                return new List<DefectHistoryEntry>();
-            }
+            var history = LoadHistory(piece, moule);
+            return history.Where(e => e.Id == defectId)
+                          .OrderByDescending(e => e.Date)
+                          .ThenByDescending(e => e.Heure)
+                          .ToList();
         }
 
         public static void LogDefectAction(ProductionContext context, string controllerName, Defect defect, string action)
         {
             if (context == null || context.Piece == "---" || context.Moule == "---") return;
-            try
+
+            // On verrouille l'accès pendant l'écriture
+            lock (_fileLock)
             {
-                string filePath = Path.Combine(GetDirectoryPath(), GetSafeFileName(context.Piece, context.Moule));
-
-                // On utilise LoadHistory au lieu de lire brutalement le fichier pour bénéficier du Patch Rétroactif
-                List<DefectHistoryEntry> history = LoadHistory(context.Piece, context.Moule);
-
-                history.Add(new DefectHistoryEntry
+                try
                 {
-                    Id = defect.Id,
-                    Date = DateTime.Now.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture),
-                    Heure = DateTime.Now.ToString("HH:mm:ss"),
-                    Utilisateur = string.IsNullOrWhiteSpace(controllerName) ? "Inconnu" : controllerName,
-                    TypeDefaut = defect.DefectType,
-                    Gravite = defect.State.ToString(),
-                    Commentaire = defect.Comment,
-                    NumeroNoyau = defect.CoreNumber,
-                    Action = action, // "Création" ou "Modification"
-                    IdDms = DMSService.GetLatestDMSId(context.Machine, context.Piece, context.Moule),
-                    Machine = context.Machine,
-                    DateDms = DMSService.GetLastDMSDateString(context.Machine, context.Piece, context.Moule),
-                    DateInitiale = DateTime.Now.ToString("dd/MM/yyyy")
-                });
+                    string filePath = Path.Combine(GetDirectoryPath(), GetSafeFileName(context.Piece, context.Moule));
+                    List<DefectHistoryEntry> history = LoadHistory(context.Piece, context.Moule);
 
-                File.WriteAllText(filePath, JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true }));
+                    history.Add(new DefectHistoryEntry
+                    {
+                        Id = defect.Id,
+                        Date = DateTime.Now.ToString("dd/MM/yyyy"),
+                        Heure = DateTime.Now.ToString("HH:mm:ss"),
+                        Utilisateur = string.IsNullOrWhiteSpace(controllerName) ? "Inconnu" : controllerName,
+                        TypeDefaut = defect.DefectType,
+                        Gravite = defect.State.ToString(),
+                        Commentaire = defect.Comment,
+                        NumeroNoyau = defect.CoreNumber,
+                        Action = action,
+                        IdDms = DMSService.GetLatestDMSId(context.Machine, context.Piece, context.Moule),
+                        Machine = context.Machine,
+                        DateDms = DMSService.GetLastDMSDateString(context.Machine, context.Piece, context.Moule)
+                    });
+
+                    string json = JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true });
+
+                    // Répétition en cas de conflit avec le PDF
+                    for (int i = 0; i < 5; i++)
+                    {
+                        try
+                        {
+                            File.WriteAllText(filePath, json);
+                            return; // Succès !
+                        }
+                        catch (IOException) { Thread.Sleep(100); } // Attente 100ms
+                    }
+                }
+                catch (Exception ex) { Logger.Log($"Erreur CRITIQUE LogDefectAction : {ex.Message}"); }
             }
-            catch (Exception ex) { Logger.Log($"Erreur LogDefectAction : {ex.Message}"); }
         }
 
         public static List<Defect> GetUnresolvedDefects(string piece, string moule)
