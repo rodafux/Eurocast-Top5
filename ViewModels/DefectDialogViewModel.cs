@@ -37,9 +37,10 @@ namespace Top5.ViewModels
         public ICommand SaveCommand { get; }
         public Action? CloseAction { get; set; }
 
-        public DefectDialogViewModel(Defect? existingDefect = null, ProductionContext? context = null, string controller = "Inconnu")
+        public DefectDialogViewModel(Defect? existingDefect = null, ProductionContext? context = null, string controller = "Inconnu", bool isReadOnly = false)
         {
             SaveCommand = new RelayCommand(_ => { IsSaved = true; CloseAction?.Invoke(); });
+            IsReadOnly = isReadOnly;
 
             if (existingDefect != null)
             {
@@ -68,7 +69,7 @@ namespace Top5.ViewModels
                 _defect.State = SelectedState;
                 _defect.Comment = Comment;
                 _defect.CoreNumber = CoreNumber;
-                _defect.IsModified = true; // Allume l'étoile
+                _defect.IsModified = true;
                 DefectHistoryService.LogDefectAction(_context, _controller, _defect, "Modification");
             }
         }

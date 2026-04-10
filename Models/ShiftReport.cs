@@ -14,12 +14,19 @@ namespace Top5.Models
         private ControlState _aspectState = ControlState.NonRenseigne;
         private string _generalComment = string.Empty;
         private int _ancCount = 0;
+        private bool _isEditable = true;
 
         public DateTime WorkDate { get; set; }
         public ShiftType Shift { get; set; }
         public ProductionContext Production { get; set; } = new ProductionContext();
 
         public Func<string>? GetControllerName { get; set; }
+
+        public bool IsEditable
+        {
+            get => _isEditable;
+            set { _isEditable = value; OnPropertyChanged(); }
+        }
 
         public ControlState RXState
         {
@@ -65,12 +72,14 @@ namespace Top5.Models
             AddDefectCommand = new RelayCommand(ExecuteAddDefect);
             EditDefectCommand = new RelayCommand(ExecuteEditDefect);
 
-            IncrementANCCommand = new RelayCommand(_ => AncCount++);
-            DecrementANCCommand = new RelayCommand(_ => { if (AncCount > 0) AncCount--; });
+            IncrementANCCommand = new RelayCommand(_ => { if (IsEditable) AncCount++; });
+            DecrementANCCommand = new RelayCommand(_ => { if (IsEditable && AncCount > 0) AncCount--; });
         }
 
         private void ExecuteCycleState(object? parameter)
         {
+            if (!IsEditable) return;
+
             if (parameter is string type)
             {
                 if (type == "RX") RXState = GetNextState(RXState);
@@ -93,7 +102,8 @@ namespace Top5.Models
 
         private void ExecuteAddDefect(object? obj)
         {
-            // VÉRIFICATION MÉTIER
+            if (!IsEditable) return;
+
             if (Production.Piece == "---" || Production.Moule == "---")
             {
                 MessageBox.Show("Impossible d'ajouter un défaut : Aucune pièce ou moule n'est affecté à cette machine actuellement.\nVeuillez d'abord configurer la production en cours.",
@@ -103,8 +113,7 @@ namespace Top5.Models
 
             string controller = GetControllerName?.Invoke() ?? "Inconnu";
 
-            // ON PASSE LE CONTEXTE DE CREATION
-            var result = DialogService.Instance.ShowDefectDialog(null, Production, controller);
+            var result = DialogService.Instance.ShowDefectDialog(null, Production, controller, false);
 
             if (result.Validated && result.Data != null)
             {
@@ -117,7 +126,8 @@ namespace Top5.Models
         {
             if (parameter is Defect defectToEdit)
             {
-                if (Production.Piece == "---" || Production.Moule == "---")
+                // En mode édition, on bloque si pas de prod. En consultation, on laisse passer.
+                if (IsEditable && (Production.Piece == "---" || Production.Moule == "---"))
                 {
                     MessageBox.Show("Impossible de modifier un défaut sur une machine sans production affectée.",
                                     "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -126,10 +136,10 @@ namespace Top5.Models
 
                 string controller = GetControllerName?.Invoke() ?? "Inconnu";
 
-                // ON PASSE LE DÉFAUT + LE CONTEXTE DE MODIFICATION
-                var result = DialogService.Instance.ShowDefectDialog(defectToEdit, Production, controller);
+                // Le paramètre !IsEditable force le mode "Lecture Seule" de la modale si l'équipe est clôturée
+                var result = DialogService.Instance.ShowDefectDialog(defectToEdit, Production, controller, !IsEditable);
 
-                if (result.Validated)
+                if (result.Validated && IsEditable)
                 {
                     if (result.Deleted)
                     {
@@ -142,8 +152,6 @@ namespace Top5.Models
                         defectToEdit.State = result.Data.State;
                         defectToEdit.Comment = result.Data.Comment;
                         defectToEdit.CoreNumber = result.Data.CoreNumber;
-
-                        // ON ALLUME L'ÉTOILE DE MODIFICATION ICI !
                         defectToEdit.IsModified = true;
 
                         DefectHistoryService.LogDefectAction(Production, controller, defectToEdit, "Modification");

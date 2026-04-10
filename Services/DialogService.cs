@@ -10,9 +10,9 @@ namespace Top5.Services
 
         private DialogService() { }
 
-        public (bool Validated, bool Deleted, Defect? Data) ShowDefectDialog(Defect? existingDefect = null, ProductionContext? context = null, string controller = "Inconnu")
+        public (bool Validated, bool Deleted, Defect? Data) ShowDefectDialog(Defect? existingDefect = null, ProductionContext? context = null, string controller = "Inconnu", bool isReadOnly = false)
         {
-            var viewModel = new DefectDialogViewModel(existingDefect, context, controller);
+            var viewModel = new DefectDialogViewModel(existingDefect, context, controller, isReadOnly);
             var window = new DefectDialogWindow
             {
                 DataContext = viewModel

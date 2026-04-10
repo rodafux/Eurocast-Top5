@@ -60,7 +60,7 @@
                 <ColumnDefinition Width="1*"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,4">
+            <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,4" IsEnabled="{Binding IsEditable}">
                 <Button Content="RX" Command="{Binding CycleStateCommand}" CommandParameter="RX" 
                         Background="{Binding RXState, Converter={StaticResource StateToBrushConverter}}" 
                         Style="{StaticResource FlatColorButtonStyle}" Width="35" Height="22" Margin="0,0,3,0"/>
@@ -103,10 +103,9 @@
                     <DataTemplate>
                         <Button Style="{StaticResource InvisibleButtonStyle}" Margin="0,1"
                                 Command="{Binding DataContext.EditDefectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}" ToolTip="Cliquer pour modifier ou supprimer">
+                                CommandParameter="{Binding}" ToolTip="Cliquer pour consulter (ou modifier si l'équipe est active)">
 
                             <StackPanel Orientation="Vertical" Margin="0,2,0,4">
-
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Fill="{Binding State, Converter={StaticResource StateToBrushConverter}}" Width="10" Height="10" Margin="0,0,4,0" Stroke="Black" StrokeThickness="0.5" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding DefectType}" FontSize="11" VerticalAlignment="Center" FontWeight="SemiBold"/>
@@ -155,7 +154,6 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-
                             </StackPanel>
                         </Button>
                     </DataTemplate>
@@ -164,7 +162,8 @@
 
             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GeneralComment, UpdateSourceTrigger=PropertyChanged}" 
                      TextWrapping="Wrap" AcceptsReturn="True" MinHeight="22" FontSize="11" Background="#FAFAFA" BorderBrush="#DDDDDD"
-                     ToolTip="Commentaire général de l'équipe"/>
+                     ToolTip="Commentaire général de l'équipe"
+                     IsEnabled="{Binding IsEditable}" />
         </Grid>
     </Border>
 </UserControl>

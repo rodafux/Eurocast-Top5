@@ -233,7 +233,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <views:ShiftReportControl DataContext="{Binding ReportMatin}" IsEnabled="{Binding DataContext.IsMatinEnabled, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                <views:ShiftReportControl DataContext="{Binding ReportMatin}" />
                             </Border>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
@@ -277,7 +277,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <views:ShiftReportControl DataContext="{Binding ReportApresMidi}" IsEnabled="{Binding DataContext.IsApresMidiEnabled, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                <views:ShiftReportControl DataContext="{Binding ReportApresMidi}" />
                             </Border>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
@@ -321,7 +321,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <views:ShiftReportControl DataContext="{Binding ReportNuit}" IsEnabled="{Binding DataContext.IsNuitEnabled, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                <views:ShiftReportControl DataContext="{Binding ReportNuit}" />
                             </Border>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
