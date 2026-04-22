@@ -145,6 +145,9 @@ namespace Top5.Models
             {
                 Defects.Add(result.Data);
                 DefectHistoryService.LogDefectAction(Production, controller, result.Data, "Création");
+
+                // NOUVEAU : Appel de la mise à jour conditionnelle
+                AutoUpdateStatesFromDefects();
             }
         }
 
@@ -165,7 +168,6 @@ namespace Top5.Models
                 {
                     if (result.Deleted)
                     {
-                        // NOUVEAU : On applique la raison avant de l'envoyer dans l'historique JSON
                         if (result.Data != null)
                         {
                             defectToEdit.Comment = result.Data.Comment;
@@ -184,8 +186,45 @@ namespace Top5.Models
 
                         DefectHistoryService.LogDefectAction(Production, controller, defectToEdit, "Modification");
                     }
+
+                    // NOUVEAU : Appel de la mise à jour conditionnelle
+                    AutoUpdateStatesFromDefects();
                 }
             }
+        }
+
+        // NOUVEAU : Moteur de mise à jour intelligente
+        private void AutoUpdateStatesFromDefects()
+        {
+            var mapping = DefectTypeDataService.Load();
+            ControlState worstRX = ControlState.NonRenseigne;
+            ControlState worst3D = ControlState.NonRenseigne;
+            ControlState worstAC = ControlState.NonRenseigne;
+
+            // 1. Calcul de la gravité maximale requise pour chaque indicateur
+            foreach (var def in Defects)
+            {
+                // Si le défaut est juste "Validé / Conforme", on l'ignore pour ne pas forcer de changement
+                if (def.State == ControlState.NonRenseigne || def.State == ControlState.B) continue;
+
+                var map = mapping.FirstOrDefault(m => m.Name.Equals(def.DefectType, StringComparison.OrdinalIgnoreCase));
+                if (map == null) continue;
+
+                if (map.AffectsRX && def.State > worstRX) worstRX = def.State;
+                if (map.Affects3D && def.State > worst3D) worst3D = def.State;
+                if (map.AffectsAC && def.State > worstAC) worstAC = def.State;
+            }
+
+            // 2. Application ciblée de la correction de gravité
+            // On écrase l'état de la pastille SEULEMENT si sa gravité est inférieure au défaut ajouté (ex: elle est en Vert (B) ou Grise (Non Renseigné) mais un défaut est AA ou NC)
+            if (worstRX > ControlState.B && (RXState == ControlState.B || RXState == ControlState.NonRenseigne || RXState < worstRX))
+                RXState = worstRX;
+
+            if (worst3D > ControlState.B && (DimensionalState == ControlState.B || DimensionalState == ControlState.NonRenseigne || DimensionalState < worst3D))
+                DimensionalState = worst3D;
+
+            if (worstAC > ControlState.B && (AspectState == ControlState.B || AspectState == ControlState.NonRenseigne || AspectState < worstAC))
+                AspectState = worstAC;
         }
     }
 }
