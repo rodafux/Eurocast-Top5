@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using Top5.Services;
@@ -82,9 +83,36 @@ namespace Top5.Models
 
             if (parameter is string type)
             {
-                if (type == "RX") RXState = GetNextState(RXState);
-                else if (type == "3D") DimensionalState = GetNextState(DimensionalState);
-                else if (type == "AC") AspectState = GetNextState(AspectState);
+                ControlState currentState = type switch { "RX" => RXState, "3D" => DimensionalState, "AC" => AspectState, _ => ControlState.NonRenseigne };
+                ControlState nextState = GetNextState(currentState);
+
+                // --- VÉRIFICATION DE SÉCURITÉ MÉTIER ---
+                var mapping = DefectTypeDataService.Load();
+                ControlState worstDefectState = ControlState.NonRenseigne;
+
+                foreach (var def in Defects)
+                {
+                    var map = mapping.FirstOrDefault(m => m.Name.Equals(def.DefectType, StringComparison.OrdinalIgnoreCase));
+                    if (map == null) continue;
+
+                    bool appliesToCategory = (type == "RX" && map.AffectsRX) || (type == "3D" && map.Affects3D) || (type == "AC" && map.AffectsAC);
+
+                    if (appliesToCategory && def.State > worstDefectState)
+                    {
+                        worstDefectState = def.State;
+                    }
+                }
+
+                // L'utilisateur ne peut pas valider un état inférieur au pire défaut déclaré (Mais il a le droit de remettre à Non Renseigné).
+                if (nextState != ControlState.NonRenseigne && nextState < worstDefectState)
+                {
+                    MessageBox.Show($"Action impossible.\n\nUn défaut en cours bloque ce point de contrôle au niveau de gravité minimum : {worstDefectState}.", "Sécurité Qualité Poka-Yoke", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    nextState = worstDefectState;
+                }
+
+                if (type == "RX") RXState = nextState;
+                else if (type == "3D") DimensionalState = nextState;
+                else if (type == "AC") AspectState = nextState;
             }
         }
 
@@ -106,8 +134,7 @@ namespace Top5.Models
 
             if (Production.Piece == "---" || Production.Moule == "---")
             {
-                MessageBox.Show("Impossible d'ajouter un défaut : Aucune pièce ou moule n'est affecté à cette machine actuellement.\nVeuillez d'abord configurer la production en cours.",
-                                "Machine sans production", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Impossible d'ajouter un défaut : Aucune pièce ou moule n'est affecté.", "Machine sans production", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -119,6 +146,9 @@ namespace Top5.Models
             {
                 Defects.Add(result.Data);
                 DefectHistoryService.LogDefectAction(Production, controller, result.Data, "Création");
+
+                // --- MISE À JOUR AUTO DES PASTILLES PRINCIPALES ---
+                AutoUpdateStatesFromDefects();
             }
         }
 
@@ -126,17 +156,13 @@ namespace Top5.Models
         {
             if (parameter is Defect defectToEdit)
             {
-                // En mode édition, on bloque si pas de prod. En consultation, on laisse passer.
                 if (IsEditable && (Production.Piece == "---" || Production.Moule == "---"))
                 {
-                    MessageBox.Show("Impossible de modifier un défaut sur une machine sans production affectée.",
-                                    "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("Impossible de modifier un défaut sur une machine sans production affectée.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 string controller = GetControllerName?.Invoke() ?? "Inconnu";
-
-                // Le paramètre !IsEditable force le mode "Lecture Seule" de la modale si l'équipe est clôturée
                 var result = DialogService.Instance.ShowDefectDialog(defectToEdit, Production, controller, !IsEditable);
 
                 if (result.Validated && IsEditable)
@@ -156,8 +182,37 @@ namespace Top5.Models
 
                         DefectHistoryService.LogDefectAction(Production, controller, defectToEdit, "Modification");
                     }
+
+                    // --- MISE À JOUR AUTO DES PASTILLES PRINCIPALES ---
+                    AutoUpdateStatesFromDefects();
                 }
             }
+        }
+
+        // --- NOUVELLE MÉTHODE ---
+        private void AutoUpdateStatesFromDefects()
+        {
+            var mapping = DefectTypeDataService.Load();
+            ControlState worstRX = ControlState.NonRenseigne;
+            ControlState worst3D = ControlState.NonRenseigne;
+            ControlState worstAC = ControlState.NonRenseigne;
+
+            foreach (var def in Defects)
+            {
+                if (def.State == ControlState.NonRenseigne) continue;
+
+                var map = mapping.FirstOrDefault(m => m.Name.Equals(def.DefectType, StringComparison.OrdinalIgnoreCase));
+                if (map == null) continue;
+
+                if (map.AffectsRX && def.State > worstRX) worstRX = def.State;
+                if (map.Affects3D && def.State > worst3D) worst3D = def.State;
+                if (map.AffectsAC && def.State > worstAC) worstAC = def.State;
+            }
+
+            // On écrase l'état général si la gravité du défaut est supérieure ou si le point n'a pas encore été renseigné.
+            if (worstRX > ControlState.NonRenseigne && (RXState < worstRX || RXState == ControlState.NonRenseigne)) RXState = worstRX;
+            if (worst3D > ControlState.NonRenseigne && (DimensionalState < worst3D || DimensionalState == ControlState.NonRenseigne)) DimensionalState = worst3D;
+            if (worstAC > ControlState.NonRenseigne && (AspectState < worstAC || AspectState == ControlState.NonRenseigne)) AspectState = worstAC;
         }
     }
 }

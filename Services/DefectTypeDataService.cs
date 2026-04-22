@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
+using Top5.Models;
 using Top5.Utils;
 
 namespace Top5.Services
@@ -25,7 +27,7 @@ namespace Top5.Services
             return Path.Combine(directory, FileName);
         }
 
-        public static List<string> Load()
+        public static List<DefectTypeModel> Load()
         {
             try
             {
@@ -33,7 +35,27 @@ namespace Top5.Services
                 if (File.Exists(filePath))
                 {
                     string json = File.ReadAllText(filePath);
-                    return JsonSerializer.Deserialize<List<string>>(json) ?? GetDefaultList();
+
+                    // Gestion sécurisée de la rétrocompatibilité via JsonDocument
+                    using (JsonDocument doc = JsonDocument.Parse(json))
+                    {
+                        if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0)
+                        {
+                            // Si le vieux fichier contient de simples strings
+                            if (doc.RootElement[0].ValueKind == JsonValueKind.String)
+                            {
+                                var stringList = JsonSerializer.Deserialize<List<string>>(json);
+                                if (stringList != null)
+                                {
+                                    // On migre silencieusement vers le nouveau modèle (on coche AC et 3D par défaut par sécurité)
+                                    return stringList.Select(s => new DefectTypeModel { Name = s, AffectsAC = true, Affects3D = true }).ToList();
+                                }
+                            }
+                        }
+                    }
+
+                    // Format actuel normalisé
+                    return JsonSerializer.Deserialize<List<DefectTypeModel>>(json) ?? GetDefaultList();
                 }
             }
             catch (Exception ex)
@@ -43,7 +65,7 @@ namespace Top5.Services
             return GetDefaultList();
         }
 
-        public static void Save(List<string> defectTypes)
+        public static void Save(List<DefectTypeModel> defectTypes)
         {
             try
             {
@@ -59,13 +81,21 @@ namespace Top5.Services
             }
         }
 
-        private static List<string> GetDefaultList()
+        private static List<DefectTypeModel> GetDefaultList()
         {
-            return new List<string>
+            return new List<DefectTypeModel>
             {
-                "Porosité", "Fissure / Crique", "Rayure", "Manque matière",
-                "Ébavurage incomplet", "Déformation", "Coup / Choc",
-                "Noyau cassé", "Noyau plié", "Noyau HS", "Autre"
+                new DefectTypeModel { Name = "Porosité", AffectsRX = true, Affects3D = false, AffectsAC = true },
+                new DefectTypeModel { Name = "Fissure / Crique", AffectsRX = true, Affects3D = false, AffectsAC = true },
+                new DefectTypeModel { Name = "Rayure", AffectsRX = false, Affects3D = false, AffectsAC = true },
+                new DefectTypeModel { Name = "Manque matière", AffectsRX = false, Affects3D = true, AffectsAC = true },
+                new DefectTypeModel { Name = "Ébavurage incomplet", AffectsRX = false, Affects3D = true, AffectsAC = true },
+                new DefectTypeModel { Name = "Déformation", AffectsRX = false, Affects3D = true, AffectsAC = true },
+                new DefectTypeModel { Name = "Coup / Choc", AffectsRX = false, Affects3D = true, AffectsAC = true },
+                new DefectTypeModel { Name = "Noyau cassé", AffectsRX = false, Affects3D = true, AffectsAC = true },
+                new DefectTypeModel { Name = "Noyau plié", AffectsRX = false, Affects3D = true, AffectsAC = true },
+                new DefectTypeModel { Name = "Noyau HS", AffectsRX = false, Affects3D = true, AffectsAC = true },
+                new DefectTypeModel { Name = "Autre", AffectsRX = true, Affects3D = true, AffectsAC = true }
             };
         }
     }

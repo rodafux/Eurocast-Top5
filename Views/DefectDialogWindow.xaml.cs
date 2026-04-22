@@ -1,5 +1,5 @@
 ﻿using System.Windows;
-using Top5.Models; // Ajouté pour pouvoir lire l'énumération ControlState
+using Top5.Models;
 using Top5.ViewModels;
 
 namespace Top5.Views
@@ -39,7 +39,7 @@ namespace Top5.Views
                     return;
                 }
 
-                // 3. NOUVELLE RÈGLE : Vérification de l'état obligatoire
+                // 3. Vérification de l'état obligatoire
                 if (vm.SelectedState == ControlState.NonRenseigne)
                 {
                     MessageBox.Show("Veuillez obligatoirement sélectionner un état pour ce défaut :\n- Conforme\n- À Améliorer\n- Non Conforme",
@@ -47,7 +47,6 @@ namespace Top5.Views
                     return;
                 }
 
-                // Si toutes les sécurités sont passées, on sauvegarde
                 vm.SaveCommand.Execute(null);
             }
         }

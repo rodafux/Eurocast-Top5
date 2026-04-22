@@ -3,19 +3,20 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
+using Top5.Models;
 using Top5.Services;
 
 namespace Top5.ViewModels
 {
     public class DefectTypesViewModel : ViewModelBase
     {
-        public ObservableCollection<string> DefectTypes { get; set; }
+        public ObservableCollection<DefectTypeModel> DefectTypes { get; set; }
 
         private string _newType = string.Empty;
         public string NewType { get => _newType; set { _newType = value; OnPropertyChanged(); } }
 
-        private string? _selectedType;
-        public string? SelectedType { get => _selectedType; set { _selectedType = value; OnPropertyChanged(); } }
+        private DefectTypeModel? _selectedType;
+        public DefectTypeModel? SelectedType { get => _selectedType; set { _selectedType = value; OnPropertyChanged(); } }
 
         public ICommand AddCommand { get; }
         public ICommand DeleteCommand { get; }
@@ -26,7 +27,7 @@ namespace Top5.ViewModels
         public DefectTypesViewModel()
         {
             var types = DefectTypeDataService.Load();
-            DefectTypes = new ObservableCollection<string>(types.OrderBy(x => x));
+            DefectTypes = new ObservableCollection<DefectTypeModel>(types.OrderBy(x => x.Name));
 
             AddCommand = new RelayCommand(ExecuteAdd);
             DeleteCommand = new RelayCommand(ExecuteDelete);
@@ -38,14 +39,15 @@ namespace Top5.ViewModels
             string trimmed = NewType.Trim();
             if (string.IsNullOrWhiteSpace(trimmed)) return;
 
-            if (DefectTypes.Any(x => x.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
+            if (DefectTypes.Any(x => x.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
             {
                 MessageBox.Show("Ce type de défaut existe déjà.", "Doublon", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            DefectTypes.Add(trimmed);
-            var sorted = DefectTypes.OrderBy(x => x).ToList();
+            DefectTypes.Add(new DefectTypeModel { Name = trimmed, AffectsAC = true, Affects3D = true });
+
+            var sorted = DefectTypes.OrderBy(x => x.Name).ToList();
             DefectTypes.Clear();
             foreach (var t in sorted) DefectTypes.Add(t);
 
@@ -54,7 +56,7 @@ namespace Top5.ViewModels
 
         private void ExecuteDelete(object? obj)
         {
-            if (!string.IsNullOrEmpty(SelectedType))
+            if (SelectedType != null)
             {
                 DefectTypes.Remove(SelectedType);
             }

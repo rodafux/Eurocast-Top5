@@ -22,7 +22,8 @@ namespace Top5.ViewModels
         public bool IsReadOnly { get => _isReadOnly; set { _isReadOnly = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsEditable)); } }
         public bool IsEditable => !IsReadOnly;
 
-        public ObservableCollection<string> AvailableDefects { get; set; } = new ObservableCollection<string>(DefectTypeDataService.Load());
+        // On extrait uniquement les noms pour la liste déroulante de saisie
+        public ObservableCollection<string> AvailableDefects { get; set; } = new ObservableCollection<string>(DefectTypeDataService.Load().Select(d => d.Name));
         public ObservableCollection<DefectHistoryEntry> History { get; set; } = new ObservableCollection<DefectHistoryEntry>();
 
         private string _selectedDefectType = string.Empty;
