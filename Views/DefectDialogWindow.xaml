@@ -31,6 +31,10 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="Opacity" Value="0.9"/>
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.3"/>
+                                <Setter Property="Cursor" Value="No"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -69,7 +73,7 @@
         </StackPanel>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20" IsEnabled="{Binding IsEditable}">
-            <RadioButton Content="Conforme" IsChecked="{Binding SelectedState, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=B}" 
+            <RadioButton Content="Validé" IsEnabled="{Binding IsEditMode}" IsChecked="{Binding SelectedState, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=B}" 
                          Style="{StaticResource StateRadioButton}" Background="#2ECC71"/>
             <RadioButton Content="À Améliorer" IsChecked="{Binding SelectedState, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=AA}" 
                          Style="{StaticResource StateRadioButton}" Background="#F39C12"/>
@@ -142,7 +146,7 @@
         <Grid Grid.Row="7" Margin="5,5,5,0">
             <Button Content="🗑️ Supprimer" Click="BtnSupprimer_Click" HorizontalAlignment="Left" Width="120" Height="40" 
                     Background="#E74C3C" Foreground="White" FontWeight="Bold" FontSize="14" BorderThickness="0" Cursor="Hand"
-                    Visibility="{Binding IsEditable, Converter={StaticResource BoolToVis}}"/>
+                    Visibility="{Binding CanDelete, Converter={StaticResource BoolToVis}}"/>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Fermer" Click="BtnAnnuler_Click" Width="100" Height="40" Background="#95A5A6" 

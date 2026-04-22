@@ -103,7 +103,8 @@
                     <DataTemplate>
                         <Button Style="{StaticResource InvisibleButtonStyle}" Margin="0,1"
                                 Command="{Binding DataContext.EditDefectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}" ToolTip="Cliquer pour consulter (ou modifier si l'équipe est active)">
+                                CommandParameter="{Binding}" 
+                                ToolTip="{Binding FormattedCreationDate}">
 
                             <StackPanel Orientation="Vertical" Margin="0,2,0,4">
                                 <StackPanel Orientation="Horizontal">

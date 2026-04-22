@@ -25,24 +25,21 @@ namespace Top5.Views
         {
             if (DataContext is DefectDialogViewModel vm)
             {
-                // 1. Vérification du Type de défaut
                 if (string.IsNullOrWhiteSpace(vm.SelectedDefectType))
                 {
                     MessageBox.Show("Veuillez sélectionner ou taper un type de défaut.", "Saisie invalide", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                // 2. Vérification du Noyau (si requis)
                 if (vm.IsCoreNumberRequired && string.IsNullOrWhiteSpace(vm.CoreNumber))
                 {
                     MessageBox.Show("Veuillez saisir un numéro de noyau pour ce type de défaut.", "Information manquante", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                // 3. Vérification de l'état obligatoire
                 if (vm.SelectedState == ControlState.NonRenseigne)
                 {
-                    MessageBox.Show("Veuillez obligatoirement sélectionner un état pour ce défaut :\n- Conforme\n- À Améliorer\n- Non Conforme",
+                    MessageBox.Show("Veuillez obligatoirement sélectionner un état pour ce défaut :\n- Validé\n- À Améliorer\n- Non Conforme",
                                     "État manquant", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
@@ -53,8 +50,20 @@ namespace Top5.Views
 
         private void BtnSupprimer_Click(object sender, RoutedEventArgs e)
         {
-            if (MessageBox.Show("Êtes-vous sûr de vouloir supprimer ce défaut ?", "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            // Appel de la fenêtre personnalisée de suppression
+            var reasonWindow = new DeleteReasonWindow { Owner = this };
+
+            if (reasonWindow.ShowDialog() == true)
             {
+                if (DataContext is DefectDialogViewModel vm)
+                {
+                    string cause = reasonWindow.ReasonText.Trim();
+                    string prefix = string.IsNullOrWhiteSpace(vm.Comment) ? "" : vm.Comment.Trim() + "\n";
+
+                    // On modifie le commentaire en temps réel avant de renvoyer le signal de suppression
+                    vm.Comment = $"{prefix}(Cause de la suppression : {cause})";
+                }
+
                 IsDeleted = true;
                 this.DialogResult = true;
             }

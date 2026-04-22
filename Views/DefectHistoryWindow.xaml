@@ -53,12 +53,11 @@
                   Background="White" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#EEEEEE"
                   RowBackground="#FFFFFF" AlternatingRowBackground="#F9F9F9" HeadersVisibility="Column">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Date du DMS" Binding="{Binding DateDms}" Width="100" Foreground="#005A9E" FontStyle="Italic" FontWeight="Bold"/>
-                <DataGridTextColumn Header="Date d'Ajout" Binding="{Binding DateInitiale}" Width="100" Foreground="#005A9E"/>
-                <DataGridTextColumn Header="Dernière Modif." Binding="{Binding Date}" Width="110" FontWeight="SemiBold"/>
+                <DataGridTextColumn Header="Date du DMS" Binding="{Binding DateDms}" SortMemberPath="DateTimeDms" Width="100" Foreground="#005A9E" FontStyle="Italic" FontWeight="Bold"/>
+                <DataGridTextColumn Header="Date d'Ajout" Binding="{Binding DateInitiale}" SortMemberPath="DateTimeInitiale" Width="100" Foreground="#005A9E"/>
+                <DataGridTextColumn Header="Dernière Modif." Binding="{Binding Date}" SortMemberPath="DateTimeModif" Width="110" FontWeight="SemiBold"/>
 
                 <DataGridTextColumn Header="Machine" Binding="{Binding Machine}" Width="90" FontWeight="Bold" Foreground="#2980B9"/>
-
                 <DataGridTextColumn Header="Type" Binding="{Binding TypeDefaut}" Width="130" FontWeight="Bold"/>
                 <DataGridTextColumn Header="Gravité" Binding="{Binding Gravite}" Width="70"/>
                 <DataGridTextColumn Header="Noyau" Binding="{Binding NumeroNoyau}" Width="70" Foreground="#C0392B" FontWeight="Bold"/>
@@ -76,12 +75,12 @@
                   RowBackground="#F0F4F8" AlternatingRowBackground="#E6EEF4" HeadersVisibility="Column">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Action Réalisée" Binding="{Binding Action}" Width="120" FontWeight="Bold" Foreground="#005A9E"/>
-                <DataGridTextColumn Header="Date du DMS" Binding="{Binding DateDms}" Width="100" Foreground="#005A9E" FontStyle="Italic" FontWeight="Bold"/>
-                <DataGridTextColumn Header="Date" Binding="{Binding Date}" Width="90"/>
+
+                <DataGridTextColumn Header="Date du DMS" Binding="{Binding DateDms}" SortMemberPath="DateTimeDms" Width="100" Foreground="#005A9E" FontStyle="Italic" FontWeight="Bold"/>
+                <DataGridTextColumn Header="Date" Binding="{Binding Date}" SortMemberPath="DateTimeModif" Width="90"/>
+
                 <DataGridTextColumn Header="Heure" Binding="{Binding Heure}" Width="70"/>
-
                 <DataGridTextColumn Header="Machine" Binding="{Binding Machine}" Width="90" FontWeight="Bold" Foreground="#2980B9"/>
-
                 <DataGridTextColumn Header="Par" Binding="{Binding Utilisateur}" Width="120" FontWeight="SemiBold"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding TypeDefaut}" Width="120"/>
                 <DataGridTextColumn Header="Gravité" Binding="{Binding Gravite}" Width="70"/>

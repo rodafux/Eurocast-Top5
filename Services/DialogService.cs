@@ -20,9 +20,13 @@ namespace Top5.Services
 
             if (window.ShowDialog() == true)
             {
+                // NOUVEAU : On transmet quand même l'objet Defect avec le commentaire modifié lors d'une suppression
                 if (window.IsDeleted)
                 {
-                    return (true, true, null);
+                    return (true, true, new Defect
+                    {
+                        Comment = viewModel.Comment
+                    });
                 }
 
                 return (true, false, new Defect

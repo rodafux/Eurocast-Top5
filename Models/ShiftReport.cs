@@ -86,12 +86,13 @@ namespace Top5.Models
                 ControlState currentState = type switch { "RX" => RXState, "3D" => DimensionalState, "AC" => AspectState, _ => ControlState.NonRenseigne };
                 ControlState nextState = GetNextState(currentState);
 
-                // --- VÉRIFICATION DE SÉCURITÉ MÉTIER ---
                 var mapping = DefectTypeDataService.Load();
                 ControlState worstDefectState = ControlState.NonRenseigne;
 
                 foreach (var def in Defects)
                 {
+                    if (def.State == ControlState.NonRenseigne) continue;
+
                     var map = mapping.FirstOrDefault(m => m.Name.Equals(def.DefectType, StringComparison.OrdinalIgnoreCase));
                     if (map == null) continue;
 
@@ -103,10 +104,8 @@ namespace Top5.Models
                     }
                 }
 
-                // L'utilisateur ne peut pas valider un état inférieur au pire défaut déclaré (Mais il a le droit de remettre à Non Renseigné).
                 if (nextState != ControlState.NonRenseigne && nextState < worstDefectState)
                 {
-                    MessageBox.Show($"Action impossible.\n\nUn défaut en cours bloque ce point de contrôle au niveau de gravité minimum : {worstDefectState}.", "Sécurité Qualité Poka-Yoke", MessageBoxButton.OK, MessageBoxImage.Warning);
                     nextState = worstDefectState;
                 }
 
@@ -142,13 +141,10 @@ namespace Top5.Models
 
             var result = DialogService.Instance.ShowDefectDialog(null, Production, controller, false);
 
-            if (result.Validated && result.Data != null)
+            if (result.Validated && !result.Deleted && result.Data != null)
             {
                 Defects.Add(result.Data);
                 DefectHistoryService.LogDefectAction(Production, controller, result.Data, "Création");
-
-                // --- MISE À JOUR AUTO DES PASTILLES PRINCIPALES ---
-                AutoUpdateStatesFromDefects();
             }
         }
 
@@ -169,6 +165,12 @@ namespace Top5.Models
                 {
                     if (result.Deleted)
                     {
+                        // NOUVEAU : On applique la raison avant de l'envoyer dans l'historique JSON
+                        if (result.Data != null)
+                        {
+                            defectToEdit.Comment = result.Data.Comment;
+                        }
+
                         Defects.Remove(defectToEdit);
                         DefectHistoryService.LogDefectAction(Production, controller, defectToEdit, "Suppression");
                     }
@@ -182,37 +184,8 @@ namespace Top5.Models
 
                         DefectHistoryService.LogDefectAction(Production, controller, defectToEdit, "Modification");
                     }
-
-                    // --- MISE À JOUR AUTO DES PASTILLES PRINCIPALES ---
-                    AutoUpdateStatesFromDefects();
                 }
             }
-        }
-
-        // --- NOUVELLE MÉTHODE ---
-        private void AutoUpdateStatesFromDefects()
-        {
-            var mapping = DefectTypeDataService.Load();
-            ControlState worstRX = ControlState.NonRenseigne;
-            ControlState worst3D = ControlState.NonRenseigne;
-            ControlState worstAC = ControlState.NonRenseigne;
-
-            foreach (var def in Defects)
-            {
-                if (def.State == ControlState.NonRenseigne) continue;
-
-                var map = mapping.FirstOrDefault(m => m.Name.Equals(def.DefectType, StringComparison.OrdinalIgnoreCase));
-                if (map == null) continue;
-
-                if (map.AffectsRX && def.State > worstRX) worstRX = def.State;
-                if (map.Affects3D && def.State > worst3D) worst3D = def.State;
-                if (map.AffectsAC && def.State > worstAC) worstAC = def.State;
-            }
-
-            // On écrase l'état général si la gravité du défaut est supérieure ou si le point n'a pas encore été renseigné.
-            if (worstRX > ControlState.NonRenseigne && (RXState < worstRX || RXState == ControlState.NonRenseigne)) RXState = worstRX;
-            if (worst3D > ControlState.NonRenseigne && (DimensionalState < worst3D || DimensionalState == ControlState.NonRenseigne)) DimensionalState = worst3D;
-            if (worstAC > ControlState.NonRenseigne && (AspectState < worstAC || AspectState == ControlState.NonRenseigne)) AspectState = worstAC;
         }
     }
 }

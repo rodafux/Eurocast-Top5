@@ -1,0 +1,23 @@
+<Window x:Class="Top5.Views.DeleteReasonWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Raison de la suppression" Height="220" Width="400" 
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" Background="#FAFAFA">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Veuillez indiquer la raison de cette suppression :" FontWeight="Bold" Margin="0,0,0,10" Foreground="#E74C3C"/>
+
+        <TextBox x:Name="TxtReason" Grid.Row="1" TextWrapping="Wrap" AcceptsReturn="True" Padding="5" Margin="0,0,0,15" BorderBrush="#CCCCCC" FontSize="13"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Annuler" Click="BtnCancel_Click" Width="80" Height="30" Margin="0,0,10,0" Background="White" Cursor="Hand"/>
+            <Button Content="Confirmer" Click="BtnOk_Click" Width="100" Height="30" Background="#E74C3C" Foreground="White" FontWeight="Bold" Cursor="Hand"/>
+        </StackPanel>
+    </Grid>
+</Window>

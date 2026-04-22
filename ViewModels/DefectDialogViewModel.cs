@@ -19,11 +19,25 @@ namespace Top5.ViewModels
         public bool IsSaved { get; private set; }
 
         private bool _isReadOnly;
-        public bool IsReadOnly { get => _isReadOnly; set { _isReadOnly = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsEditable)); } }
+        public bool IsReadOnly
+        {
+            get => _isReadOnly;
+            set
+            {
+                _isReadOnly = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsEditable));
+                OnPropertyChanged(nameof(CanDelete));
+            }
+        }
+
         public bool IsEditable => !IsReadOnly;
 
-        // On extrait uniquement les noms pour la liste déroulante de saisie
+        public bool CanDelete => IsEditMode && IsEditable;
+
+        // CORRECTION ICI : On extrait uniquement les noms (.Select(d => d.Name))
         public ObservableCollection<string> AvailableDefects { get; set; } = new ObservableCollection<string>(DefectTypeDataService.Load().Select(d => d.Name));
+
         public ObservableCollection<DefectHistoryEntry> History { get; set; } = new ObservableCollection<DefectHistoryEntry>();
 
         private string _selectedDefectType = string.Empty;

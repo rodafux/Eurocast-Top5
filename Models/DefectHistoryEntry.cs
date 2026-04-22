@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace Top5.Models
@@ -27,5 +28,16 @@ namespace Top5.Models
 
         [JsonIgnore]
         public ControlState StateValue => Enum.TryParse<ControlState>(Gravite, out var s) ? s : ControlState.NonRenseigne;
+
+        // --- NOUVEAU : Propriétés calculées typées DateTime pour forcer le tri chronologique WPF ---
+
+        [JsonIgnore]
+        public DateTime DateTimeDms => DateTime.TryParseExact(DateDms, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : DateTime.MinValue;
+
+        [JsonIgnore]
+        public DateTime DateTimeInitiale => DateTime.TryParseExact(DateInitiale, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : DateTime.MinValue;
+
+        [JsonIgnore]
+        public DateTime DateTimeModif => DateTime.TryParseExact(Date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : DateTime.MinValue;
     }
 }
