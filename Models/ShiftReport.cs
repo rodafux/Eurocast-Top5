@@ -16,8 +16,6 @@ namespace Top5.Models
         private string _generalComment = string.Empty;
         private int _ancCount = 0;
         private bool _isEditable = true;
-
-        // NOUVEAU : Case à cocher Sans Production
         private bool _isSP;
 
         public DateTime WorkDate { get; set; }
@@ -95,6 +93,7 @@ namespace Top5.Models
                 ControlState currentState = type switch { "RX" => RXState, "3D" => DimensionalState, "AC" => AspectState, _ => ControlState.NonRenseigne };
                 ControlState nextState = GetNextState(currentState);
 
+                // --- POKA-YOKE : Blocage du cycle manuel ---
                 var mapping = DefectTypeDataService.Load();
                 ControlState worstDefectState = ControlState.NonRenseigne;
 
@@ -154,7 +153,9 @@ namespace Top5.Models
             {
                 Defects.Add(result.Data);
                 DefectHistoryService.LogDefectAction(Production, controller, result.Data, "Création");
-                AutoUpdateStatesFromDefects();
+
+                // NOUVEAU : On cible uniquement le défaut qui vient d'être ajouté
+                AutoUpdateStatesFromDefect(result.Data);
             }
         }
 
@@ -192,39 +193,33 @@ namespace Top5.Models
                         defectToEdit.IsModified = true;
 
                         DefectHistoryService.LogDefectAction(Production, controller, defectToEdit, "Modification");
+
+                        // NOUVEAU : On cible uniquement le défaut qui vient d'être modifié
+                        AutoUpdateStatesFromDefect(defectToEdit);
                     }
-                    AutoUpdateStatesFromDefects();
                 }
             }
         }
 
-        private void AutoUpdateStatesFromDefects()
+        // NOUVEAU : Moteur ciblé sur un seul défaut (évite l'effet de bord global)
+        private void AutoUpdateStatesFromDefect(Defect def)
         {
+            if (def == null || def.State == ControlState.NonRenseigne || def.State == ControlState.B) return;
+
             var mapping = DefectTypeDataService.Load();
-            ControlState worstRX = ControlState.NonRenseigne;
-            ControlState worst3D = ControlState.NonRenseigne;
-            ControlState worstAC = ControlState.NonRenseigne;
+            var map = mapping.FirstOrDefault(m => m.Name.Equals(def.DefectType, StringComparison.OrdinalIgnoreCase));
 
-            foreach (var def in Defects)
-            {
-                if (def.State == ControlState.NonRenseigne || def.State == ControlState.B) continue;
+            if (map == null) return;
 
-                var map = mapping.FirstOrDefault(m => m.Name.Equals(def.DefectType, StringComparison.OrdinalIgnoreCase));
-                if (map == null) continue;
+            // Si le défaut affecte le point de contrôle ET que la pastille actuelle est soit "Conforme", soit "Non Renseignée", soit d'une gravité inférieure au défaut
+            if (map.AffectsRX && (RXState == ControlState.B || RXState == ControlState.NonRenseigne || RXState < def.State))
+                RXState = def.State;
 
-                if (map.AffectsRX && def.State > worstRX) worstRX = def.State;
-                if (map.Affects3D && def.State > worst3D) worst3D = def.State;
-                if (map.AffectsAC && def.State > worstAC) worstAC = def.State;
-            }
+            if (map.Affects3D && (DimensionalState == ControlState.B || DimensionalState == ControlState.NonRenseigne || DimensionalState < def.State))
+                DimensionalState = def.State;
 
-            if (worstRX > ControlState.B && (RXState == ControlState.B || RXState == ControlState.NonRenseigne || RXState < worstRX))
-                RXState = worstRX;
-
-            if (worst3D > ControlState.B && (DimensionalState == ControlState.B || DimensionalState == ControlState.NonRenseigne || DimensionalState < worst3D))
-                DimensionalState = worst3D;
-
-            if (worstAC > ControlState.B && (AspectState == ControlState.B || AspectState == ControlState.NonRenseigne || AspectState < worstAC))
-                AspectState = worstAC;
+            if (map.AffectsAC && (AspectState == ControlState.B || AspectState == ControlState.NonRenseigne || AspectState < def.State))
+                AspectState = def.State;
         }
     }
 }
