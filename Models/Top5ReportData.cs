@@ -36,6 +36,10 @@ namespace Top5.Models
         public string AspectState { get; set; } = "NonRenseigne";
         public string GeneralComment { get; set; } = string.Empty;
         public int AncCount { get; set; } = 0;
+
+        // NOUVEAU
+        public bool IsSP { get; set; } = false;
+
         public List<DefectDTO> Defects { get; set; } = new List<DefectDTO>();
     }
 
@@ -46,6 +50,6 @@ namespace Top5.Models
         public string State { get; set; } = "NonRenseigne";
         public string Comment { get; set; } = string.Empty;
         public string CoreNumber { get; set; } = string.Empty;
-        public bool IsModified { get; set; } // Sauvegarde de l'étoile
+        public bool IsModified { get; set; }
     }
 }

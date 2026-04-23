@@ -122,7 +122,6 @@ namespace Top5.Services
                         rowVm.Production.Priority = rowDto.Priority;
                         rowVm.Production.RefreshDMS();
 
-                        // L'AJOUT EST ICI : On transmet la Pièce et le Moule pour la rétroactivité
                         ApplyShift(rowVm.ReportMatin, rowDto.Matin, rowDto.Piece, rowDto.Moule);
                         ApplyShift(rowVm.ReportApresMidi, rowDto.ApresMidi, rowDto.Piece, rowDto.Moule);
                         ApplyShift(rowVm.ReportNuit, rowDto.Nuit, rowDto.Piece, rowDto.Moule);
@@ -192,6 +191,7 @@ namespace Top5.Services
                 AspectState = shift.AspectState.ToString(),
                 GeneralComment = shift.GeneralComment,
                 AncCount = shift.AncCount,
+                IsSP = shift.IsSP, // NOUVEAU
                 Defects = shift.Defects.Select(d => new DefectDTO
                 {
                     Id = d.Id,
@@ -199,12 +199,11 @@ namespace Top5.Services
                     State = d.State.ToString(),
                     Comment = d.Comment,
                     CoreNumber = d.CoreNumber,
-                    IsModified = d.IsModified // SAUVEGARDE DE L'ÉTOILE
+                    IsModified = d.IsModified
                 }).ToList()
             };
         }
 
-        // L'AJOUT EST ICI : Les paramètres piece et moule et le scan de l'historique
         private static void ApplyShift(ShiftReport shift, ShiftReportDTO dto, string piece, string moule)
         {
             if (Enum.TryParse(dto.RXState, out ControlState rx)) shift.RXState = rx;
@@ -213,10 +212,10 @@ namespace Top5.Services
 
             shift.GeneralComment = dto.GeneralComment;
             shift.AncCount = dto.AncCount;
+            shift.IsSP = dto.IsSP; // NOUVEAU
 
             shift.Defects.Clear();
 
-            // On charge l'historique pour vérifier si d'anciens défauts ont été modifiés
             var fullHistory = DefectHistoryService.LoadHistory(piece, moule);
 
             foreach (var d in dto.Defects)
@@ -230,7 +229,6 @@ namespace Top5.Services
                     IsModified = d.IsModified
                 };
 
-                // DÉTECTION RÉTROACTIVE POUR ALLUMER L'ÉTOILE
                 if (!def.IsModified && fullHistory != null && fullHistory.Any(h => h.Id == d.Id && h.Action == "Modification"))
                 {
                     def.IsModified = true;

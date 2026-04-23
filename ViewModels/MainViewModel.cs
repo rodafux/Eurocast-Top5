@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.IO;
 using Top5.Models;
 using Top5.Services;
 using Top5.Utils;
@@ -140,11 +141,26 @@ namespace Top5.ViewModels
 
         public ICommand GoToTodayCommand => new RelayCommand(_ => ViewingDate = Top5HistoryService.GetLogicalProductionDate(DateTime.Now));
 
+        // --- NOUVEAU COMPORTEMENT D'IMPRESSION ---
         public ICommand PrintReportCommand => new RelayCommand(_ =>
         {
-            var doc = PdfReportService.CreateDocument(this);
-            var win = new Top5.Views.PdfPreviewWindow(doc) { Owner = Application.Current.MainWindow };
-            win.ShowDialog();
+            try
+            {
+                // On crée un PDF temporaire pour l'aperçu et l'impression avec QuestPDF (Zéro bug d'orphelins)
+                string tempFile = Path.Combine(Path.GetTempPath(), $"Eurocast_Top5_Apercu_{ViewingDate:yyyy_MM_dd}.pdf");
+                PdfReportService.GeneratePdf(this, tempFile);
+
+                // On ouvre directement le lecteur PDF par défaut du système (Edge, Acrobat...)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = tempFile,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur lors de l'ouverture du PDF : {ex.Message}\nAssurez-vous qu'un lecteur PDF est installé.", "Erreur d'impression", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         });
 
         public ICommand OpenDMSCommand => new RelayCommand(param =>

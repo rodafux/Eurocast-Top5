@@ -61,6 +61,9 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,4" IsEnabled="{Binding IsEditable}">
+
+                <CheckBox Content="SP" IsChecked="{Binding IsSP}" ToolTip="Sans Production (Mettre en gris)" VerticalAlignment="Center" FontWeight="Bold" Foreground="#555555" Margin="0,0,8,0"/>
+
                 <Button Content="RX" Command="{Binding CycleStateCommand}" CommandParameter="RX" 
                         Background="{Binding RXState, Converter={StaticResource StateToBrushConverter}}" 
                         Style="{StaticResource FlatColorButtonStyle}" Width="35" Height="22" Margin="0,0,3,0"/>
@@ -103,8 +106,7 @@
                     <DataTemplate>
                         <Button Style="{StaticResource InvisibleButtonStyle}" Margin="0,1"
                                 Command="{Binding DataContext.EditDefectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}" 
-                                ToolTip="{Binding FormattedCreationDate}">
+                                CommandParameter="{Binding}" ToolTip="Cliquer pour consulter (ou modifier si l'équipe est active)">
 
                             <StackPanel Orientation="Vertical" Margin="0,2,0,4">
                                 <StackPanel Orientation="Horizontal">

@@ -17,6 +17,9 @@ namespace Top5.Models
         private int _ancCount = 0;
         private bool _isEditable = true;
 
+        // NOUVEAU : Case à cocher Sans Production
+        private bool _isSP;
+
         public DateTime WorkDate { get; set; }
         public ShiftType Shift { get; set; }
         public ProductionContext Production { get; set; } = new ProductionContext();
@@ -27,6 +30,12 @@ namespace Top5.Models
         {
             get => _isEditable;
             set { _isEditable = value; OnPropertyChanged(); }
+        }
+
+        public bool IsSP
+        {
+            get => _isSP;
+            set { _isSP = value; OnPropertyChanged(); }
         }
 
         public ControlState RXState
@@ -145,8 +154,6 @@ namespace Top5.Models
             {
                 Defects.Add(result.Data);
                 DefectHistoryService.LogDefectAction(Production, controller, result.Data, "Création");
-
-                // NOUVEAU : Appel de la mise à jour conditionnelle
                 AutoUpdateStatesFromDefects();
             }
         }
@@ -186,14 +193,11 @@ namespace Top5.Models
 
                         DefectHistoryService.LogDefectAction(Production, controller, defectToEdit, "Modification");
                     }
-
-                    // NOUVEAU : Appel de la mise à jour conditionnelle
                     AutoUpdateStatesFromDefects();
                 }
             }
         }
 
-        // NOUVEAU : Moteur de mise à jour intelligente
         private void AutoUpdateStatesFromDefects()
         {
             var mapping = DefectTypeDataService.Load();
@@ -201,10 +205,8 @@ namespace Top5.Models
             ControlState worst3D = ControlState.NonRenseigne;
             ControlState worstAC = ControlState.NonRenseigne;
 
-            // 1. Calcul de la gravité maximale requise pour chaque indicateur
             foreach (var def in Defects)
             {
-                // Si le défaut est juste "Validé / Conforme", on l'ignore pour ne pas forcer de changement
                 if (def.State == ControlState.NonRenseigne || def.State == ControlState.B) continue;
 
                 var map = mapping.FirstOrDefault(m => m.Name.Equals(def.DefectType, StringComparison.OrdinalIgnoreCase));
@@ -215,8 +217,6 @@ namespace Top5.Models
                 if (map.AffectsAC && def.State > worstAC) worstAC = def.State;
             }
 
-            // 2. Application ciblée de la correction de gravité
-            // On écrase l'état de la pastille SEULEMENT si sa gravité est inférieure au défaut ajouté (ex: elle est en Vert (B) ou Grise (Non Renseigné) mais un défaut est AA ou NC)
             if (worstRX > ControlState.B && (RXState == ControlState.B || RXState == ControlState.NonRenseigne || RXState < worstRX))
                 RXState = worstRX;
 

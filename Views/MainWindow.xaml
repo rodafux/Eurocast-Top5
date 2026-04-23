@@ -139,16 +139,16 @@
             </DataGrid.RowStyle>
 
             <DataGrid.Columns>
-                <DataGridTemplateColumn Width="240">
+                <DataGridTemplateColumn Width="Auto">
                     <DataGridTemplateColumn.HeaderTemplate>
                         <DataTemplate>
-                            <Grid HorizontalAlignment="Stretch" Width="230">
+                            <Grid HorizontalAlignment="Stretch">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="35"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Prio." FontWeight="Bold" Foreground="#7F8C8D" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="1" Text="Production (Machine/Pièce/Moule)" FontWeight="Bold" Margin="5,5,0,5" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="Production" FontWeight="Bold" Margin="5,5,5,5" VerticalAlignment="Center"/>
                             </Grid>
                         </DataTemplate>
                     </DataGridTemplateColumn.HeaderTemplate>
@@ -168,7 +168,7 @@
                                     </Grid>
                                 </Button>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                     <TextBlock Text="{Binding Production.Machine}" FontSize="14" FontWeight="Bold" Foreground="#222222"/>
                                     <TextBlock Text="{Binding Production.Piece}" FontSize="12" Margin="0,2,0,0"/>
                                     <TextBlock Text="{Binding Production.Moule}" FontSize="11" Foreground="#666666" FontStyle="Italic"/>
@@ -230,6 +230,10 @@
                                                 <Setter Property="Background" Value="#E3F2FD"/>
                                                 <Setter Property="BorderBrush" Value="#90CAF9"/>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding ReportMatin.IsSP}" Value="True">
+                                                <Setter Property="Background" Value="#CCCCCC"/>
+                                                <Setter Property="BorderBrush" Value="#999999"/>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
@@ -274,6 +278,10 @@
                                                 <Setter Property="Background" Value="#E3F2FD"/>
                                                 <Setter Property="BorderBrush" Value="#90CAF9"/>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding ReportApresMidi.IsSP}" Value="True">
+                                                <Setter Property="Background" Value="#CCCCCC"/>
+                                                <Setter Property="BorderBrush" Value="#999999"/>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
@@ -317,6 +325,10 @@
                                             <DataTrigger Binding="{Binding DataContext.IsNuitActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                                 <Setter Property="Background" Value="#E3F2FD"/>
                                                 <Setter Property="BorderBrush" Value="#90CAF9"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ReportNuit.IsSP}" Value="True">
+                                                <Setter Property="Background" Value="#CCCCCC"/>
+                                                <Setter Property="BorderBrush" Value="#999999"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
