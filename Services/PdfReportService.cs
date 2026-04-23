@@ -48,7 +48,6 @@ namespace Top5.Services
 
                             foreach (var row in vm.ProductionRows.Where(r => r.Production.Piece != "---" && r.Production.Moule != "---"))
                             {
-                                // --- SÉCURITÉ POKA-YOKE : ShowEntire empêche physiquement le bloc machine d'être orphelin ---
                                 col.Item().ShowEntire().Column(rowCol =>
                                 {
                                     rowCol.Item().PaddingTop(5).Background(QColors.Grey.Lighten4).Padding(4).Row(r =>
@@ -68,7 +67,6 @@ namespace Top5.Services
                                     {
                                         table.ColumnsDefinition(columns => { columns.RelativeColumn(); columns.RelativeColumn(); columns.RelativeColumn(); });
 
-                                        // Couleur Slate Gray appliquée pour le visuel des entêtes d'équipes
                                         table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Background("#778899").Padding(2).AlignCenter().Text($"Matin ({GetControllerName(vm.ControllerMatin)})").Bold().FontColor(QColors.White);
                                         table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Background("#778899").Padding(2).AlignCenter().Text($"A-Midi ({GetControllerName(vm.ControllerApresMidi)})").Bold().FontColor(QColors.White);
                                         table.Cell().Border(1).BorderColor(QColors.Grey.Medium).Background("#778899").Padding(2).AlignCenter().Text($"Nuit ({GetControllerName(vm.ControllerNuit)})").Bold().FontColor(QColors.White);
@@ -133,7 +131,13 @@ namespace Top5.Services
                         col.Item().PaddingTop(2).Row(r =>
                         {
                             r.AutoItem().Background(stateHex).PaddingHorizontal(3).Text(d.State.ToString()).Bold().FontSize(8).FontColor(fgColor);
-                            r.AutoItem().PaddingLeft(3).Text($"{d.DefectType}{noyau}").SemiBold().FontSize(9);
+
+                            // NOUVEAU : Ajout de la date de création en gris et en italique sur le PDF
+                            r.AutoItem().PaddingLeft(3).Text(text =>
+                            {
+                                text.Span($"{d.DefectType}{noyau}").SemiBold().FontSize(9);
+                                text.Span($"  - {d.CreationDate:dd/MM HH:mm}").FontSize(8).Italic().FontColor(QColors.Grey.Medium);
+                            });
                         });
 
                         if (!string.IsNullOrWhiteSpace(d.Comment))

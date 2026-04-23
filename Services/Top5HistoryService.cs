@@ -85,7 +85,6 @@ namespace Top5.Services
                 var opts = new JsonSerializerOptions { WriteIndented = true };
 
                 File.WriteAllText(path, JsonSerializer.Serialize(dto, opts));
-                ExportPdfSync(vm, prodDate);
                 ExportMissingPdfsAsync(prodDate, startAtPastDay: true);
             }
             catch (Exception ex)
@@ -136,18 +135,6 @@ namespace Top5.Services
             }
         }
 
-        private static void ExportPdfSync(MainViewModel vm, DateTime prodDate)
-        {
-            var config = ConfigurationService.Load();
-            if (string.IsNullOrWhiteSpace(config.PdfExportPath) || config.PdfExportDays <= 0) return;
-
-            string fileName = $"TOP5_{prodDate:yy_MM_dd}-J{prodDate.DayOfYear}.pdf";
-            string fullPath = Path.Combine(config.PdfExportPath, fileName);
-
-            try { PdfReportService.GeneratePdf(vm, fullPath); }
-            catch (Exception ex) { Logger.Log($"Erreur d'export PDF synchrone : {ex.Message}"); }
-        }
-
         public static void ExportMissingPdfsAsync(DateTime currentProdDate, bool startAtPastDay = false)
         {
             var config = ConfigurationService.Load();
@@ -191,7 +178,7 @@ namespace Top5.Services
                 AspectState = shift.AspectState.ToString(),
                 GeneralComment = shift.GeneralComment,
                 AncCount = shift.AncCount,
-                IsSP = shift.IsSP, // NOUVEAU
+                IsSP = shift.IsSP,
                 Defects = shift.Defects.Select(d => new DefectDTO
                 {
                     Id = d.Id,
@@ -199,7 +186,8 @@ namespace Top5.Services
                     State = d.State.ToString(),
                     Comment = d.Comment,
                     CoreNumber = d.CoreNumber,
-                    IsModified = d.IsModified
+                    IsModified = d.IsModified,
+                    CreationDate = d.CreationDate
                 }).ToList()
             };
         }
@@ -212,7 +200,7 @@ namespace Top5.Services
 
             shift.GeneralComment = dto.GeneralComment;
             shift.AncCount = dto.AncCount;
-            shift.IsSP = dto.IsSP; // NOUVEAU
+            shift.IsSP = dto.IsSP;
 
             shift.Defects.Clear();
 
@@ -220,13 +208,42 @@ namespace Top5.Services
 
             foreach (var d in dto.Defects)
             {
+                DateTime actualDate = d.CreationDate;
+
+                // ==============================================================================
+                // AUTO-RÉPARATION POKA-YOKE
+                // On ne fait plus confiance au JSON journalier pour la date !
+                // On va lire le fichier de traçabilité historique qui est la source absolue.
+                // ==============================================================================
+                if (fullHistory != null)
+                {
+                    var historicalRecords = fullHistory.Where(h => h.Id == d.Id).ToList();
+                    if (historicalRecords.Any())
+                    {
+                        // Le premier enregistrement de la liste est la création initiale du défaut
+                        var originalRecord = historicalRecords.First();
+
+                        string timeString = originalRecord.Heure.Length >= 5 ? originalRecord.Heure.Substring(0, 5) : "00:00";
+                        if (DateTime.TryParseExact($"{originalRecord.Date} {timeString}", "dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime parsed))
+                        {
+                            actualDate = parsed; // L'écrasement corrige les JSON corrompus par le précédent lancement
+                        }
+                    }
+                }
+
+                if (actualDate == default)
+                {
+                    actualDate = DateTime.Now;
+                }
+
                 var def = new Defect
                 {
                     Id = d.Id,
                     DefectType = d.DefectType,
                     Comment = d.Comment,
                     CoreNumber = d.CoreNumber,
-                    IsModified = d.IsModified
+                    IsModified = d.IsModified,
+                    CreationDate = actualDate
                 };
 
                 if (!def.IsModified && fullHistory != null && fullHistory.Any(h => h.Id == d.Id && h.Action == "Modification"))

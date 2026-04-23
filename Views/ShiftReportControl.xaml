@@ -111,7 +111,10 @@
                             <StackPanel Orientation="Vertical" Margin="0,2,0,4">
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Fill="{Binding State, Converter={StaticResource StateToBrushConverter}}" Width="10" Height="10" Margin="0,0,4,0" Stroke="Black" StrokeThickness="0.5" VerticalAlignment="Center"/>
+
                                     <TextBlock Text="{Binding DefectType}" FontSize="11" VerticalAlignment="Center" FontWeight="SemiBold"/>
+
+                                    <TextBlock Text="{Binding CreationDate, StringFormat=' - {0:dd\\/MM HH:mm}'}" FontSize="10" Foreground="#888888" VerticalAlignment="Center" FontStyle="Italic" Margin="2,0,0,0"/>
 
                                     <TextBlock Text="*" Foreground="#E67E22" FontSize="14" FontWeight="Bold" Margin="2,-4,0,0" ToolTip="Défaut modifié">
                                         <TextBlock.Style>
